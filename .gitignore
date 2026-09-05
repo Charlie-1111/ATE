@@ -16,3 +16,4 @@ ml/roast-judge/.venv/
 .cursor/
 .opencode/
 *.local
+dist-waifly-upload/
