@@ -1,0 +1,14 @@
+node_modules
+.git
+.env
+.env.*
+!.env.example
+dist
+client/dist
+*.log
+.DS_Store
+.cursor
+.opencode
+ml
+docs
+**/.venv

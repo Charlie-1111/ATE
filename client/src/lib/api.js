@@ -1,7 +1,9 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  baseURL:
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.PROD ? '/api' : 'http://localhost:3001/api'),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -23,7 +25,6 @@ api.interceptors.response.use(
       const hadToken = !!localStorage.getItem('ate_token')
       localStorage.removeItem('ate_token')
       localStorage.removeItem('ate-auth-user')
-      // Only bounce to login if the user was authed and hit a protected route
       if (hadToken && !window.location.pathname.startsWith('/login')) {
         const path = window.location.pathname
         if (path.startsWith('/shop') || path.startsWith('/api')) {

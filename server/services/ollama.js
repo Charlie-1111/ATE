@@ -400,28 +400,41 @@ No slurs, no doxxing, no family attacks.
 Write one roast:`
 
 async function generateRoast(topic = null) {
-  const ollama = getOllama()
-  const topicLine = topic
-    ? `\nThe battle topic is: "${topic}". Your roast MUST riff on this topic.\n`
-    : ''
+  try {
+    const ollama = getOllama()
+    const topicLine = topic
+      ? `\nThe battle topic is: "${topic}". Your roast MUST riff on this topic.\n`
+      : ''
 
-  const response = await ollama.chat({
-    model: FALLBACK_MODEL,
-    messages: [{
-      role: 'user',
-      content: `${ROAST_PROMPT}${topicLine}`,
-    }],
-    stream: false,
-    options: {
-      temperature: 0.9,
-      num_predict: 60,
-    },
-  })
+    const response = await ollama.chat({
+      model: FALLBACK_MODEL,
+      messages: [{
+        role: 'user',
+        content: `${ROAST_PROMPT}${topicLine}`,
+      }],
+      stream: false,
+      options: {
+        temperature: 0.9,
+        num_predict: 60,
+      },
+    })
 
-  let text = response.message.content.trim()
-  text = text.replace(/^["']|["']$/g, '').replace(/^ROAST:\s*/i, '')
-  if (text.length > 200) text = text.substring(0, 200)
-  return text
+    let text = response.message.content.trim()
+    text = text.replace(/^["']|["']$/g, '').replace(/^ROAST:\s*/i, '')
+    if (text.length > 200) text = text.substring(0, 200)
+    if (text.length >= 8) return text
+  } catch (err) {
+    console.warn('[Ollama] generateRoast failed:', err.message)
+  }
+  // Offline / cloud deploy without Ollama
+  const pool = [
+    "Your bars buffer like dial-up and still miss the punchline.",
+    "You dress like a loading screen that never finishes.",
+    "That fit called customer support and hung up on you.",
+    "Your comebacks expire before they leave your mouth.",
+    "You've got main-character energy in a background-NPC budget.",
+  ]
+  return pool[Math.floor(Math.random() * pool.length)]
 }
 
 const TOPIC_POOL = [
