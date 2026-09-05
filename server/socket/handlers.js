@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid')
-const { scoreRoast, generateRoast, generateTopic, addMarks } = require('../services/ollama.js')
+const { scoreRoast, generateRoast, generateTopic, addMarks, heuristicScore } = require('../services/ollama.js')
 const { recordMatchResult } = require('../services/leaderboard.js')
 
 const matchmakingQueue = []
@@ -79,6 +79,43 @@ function recordRoast(battle, userId, { marks, quality, feedback, text, isTimeout
     isTimeout: !!isTimeout,
     blocked: !!blocked,
   }
+}
+
+function playerScoreSlot(battle, userId) {
+  if (userId === battle.players[0]?.userId) return 'player1'
+  if (userId === battle.players[1]?.userId) return 'player2'
+  return null
+}
+
+/** True if this fighter already has marks for the current round (one roast only). */
+function hasRoastedThisRound(battle, userId) {
+  const slot = playerScoreSlot(battle, userId)
+  if (!slot) return false
+  const scores = battle.roundScores[battle.currentRound]
+  return !!(scores && scores[slot] != null)
+}
+
+function clearHandoffTimer(battle) {
+  if (battle?.handoffTimer) {
+    clearTimeout(battle.handoffTimer)
+    battle.handoffTimer = null
+  }
+}
+
+/** After A submits, wait then open B's turn — cancel on round end / new turn. */
+function scheduleOpponentTurn(io, battle, fromSocketId, opponent) {
+  clearHandoffTimer(battle)
+  const round = battle.currentRound
+  const handoffFor = opponent.userId
+  battle.handoffTimer = setTimeout(() => {
+    battle.handoffTimer = null
+    if (!activeBattles.has(battle.id) || battle.status !== 'active') return
+    if (battle.currentRound !== round) return
+    if (hasRoastedThisRound(battle, handoffFor)) return
+    const fromPlayer = battle.players.find((p) => p.socketId === fromSocketId)
+    if (fromPlayer) io.to(fromSocketId).emit('opponents_turn')
+    openHumanTurn(io, battle, opponent.socketId, opponent.userId)
+  }, 3000)
 }
 
 function matchPayload(battle, userId, opponent) {
@@ -256,6 +293,10 @@ function setupSocketHandlers(io) {
         socket.emit('roast_error', { error: 'already_submitted', battleId })
         return
       }
+      if (hasRoastedThisRound(battle, player.userId)) {
+        socket.emit('roast_error', { error: 'already_round_roast', battleId, round: battle.currentRound })
+        return
+      }
       if (battle.countdownActive) {
         socket.emit('roast_error', { error: 'countdown', battleId })
         return
@@ -267,9 +308,10 @@ function setupSocketHandlers(io) {
 
       const turnId = battle.turnId
       clearTurnTimer(battleId)
+      clearHandoffTimer(battle)
       battle.roastSubmitted = true
       // Ack immediately so the client knows the roast counted (before slow Ollama)
-      socket.emit('roast_accepted', { battleId, turnId, isTimeout: !!isTimeout })
+      socket.emit('roast_accepted', { battleId, turnId, isTimeout: !!isTimeout, round: battle.currentRound })
 
       let payload
 
@@ -287,6 +329,11 @@ function setupSocketHandlers(io) {
         // Stale turn / battle ended while scoring — don't apply
         if (!activeBattles.has(battle.id) || battle.turnId !== turnId) {
           socket.emit('roast_error', { error: 'stale_turn', battleId })
+          return
+        }
+        // Another path already recorded this player for the round
+        if (hasRoastedThisRound(battle, player.userId)) {
+          socket.emit('roast_error', { error: 'already_round_roast', battleId })
           return
         }
         payload = recordRoast(battle, player.userId, {
@@ -314,11 +361,7 @@ function setupSocketHandlers(io) {
         botTurn(io, battle, socket)
       } else if (opponent) {
         io.to(opponent.socketId).emit('roast_scored', payload)
-        setTimeout(() => {
-          if (!activeBattles.has(battle.id) || battle.status !== 'active') return
-          socket.emit('opponents_turn')
-          openHumanTurn(io, battle, opponent.socketId, opponent.userId)
-        }, 3000)
+        scheduleOpponentTurn(io, battle, socket.id, opponent)
       }
     })
 
@@ -393,11 +436,7 @@ function startTurnTimer(io, battle, socketId, userId, opts = {}) {
       botTurn(io, battle, { id: socketId })
     } else if (opponent) {
       battle.turnLive = false
-      setTimeout(() => {
-        if (!activeBattles.has(battle.id) || battle.status !== 'active') return
-        io.to(socketId).emit('opponents_turn')
-        openHumanTurn(io, battle, opponent.socketId, opponent.userId)
-      }, 1000)
+      scheduleOpponentTurn(io, battle, socketId, opponent)
     }
   }, TURN_TIME_MS)
 
@@ -409,8 +448,14 @@ function startTurnTimer(io, battle, socketId, userId, opts = {}) {
  */
 async function openHumanTurn(io, battle, socketId, userId) {
   if (!activeBattles.has(battle.id) || battle.status !== 'active') return
+  // Never give a second turn in the same round
+  if (hasRoastedThisRound(battle, userId)) {
+    console.warn(`[Turn] skip open — ${userId} already roasted round ${battle.currentRound}`)
+    return
+  }
 
   clearTurnTimer(battle.id)
+  clearHandoffTimer(battle)
   battle.turnId = (battle.turnId || 0) + 1
   const turnId = battle.turnId
   battle.currentTurn = userId
@@ -418,7 +463,7 @@ async function openHumanTurn(io, battle, socketId, userId) {
   battle.countdownActive = true
   battle.turnLive = false
 
-  io.to(socketId).emit('your_turn', { countdownSec: TURN_COUNTDOWN_SECS, turnId })
+  io.to(socketId).emit('your_turn', { countdownSec: TURN_COUNTDOWN_SECS, turnId, round: battle.currentRound })
 
   for (let s = TURN_COUNTDOWN_SECS; s >= 1; s--) {
     if (!activeBattles.has(battle.id) || battle.status !== 'active') return
@@ -429,6 +474,7 @@ async function openHumanTurn(io, battle, socketId, userId) {
 
   if (!activeBattles.has(battle.id) || battle.status !== 'active') return
   if (battle.turnId !== turnId) return
+  if (hasRoastedThisRound(battle, userId)) return
 
   battle.countdownActive = false
   battle.turnLive = true
@@ -467,13 +513,13 @@ async function scoreRoastBounded(text, ctx) {
       scoreRoast(text, ctx),
       new Promise((resolve) => {
         setTimeout(() => {
-          resolve({ marks: 5, quality: 5, feedback: 'MID', blocked: false, source: 'score_timeout' })
+          resolve({ ...heuristicScore(text), source: 'score_timeout' })
         }, SCORE_MS)
       }),
     ])
   } catch (err) {
     console.error('[Ollama] Scoring failed:', err.message)
-    return { marks: 5, quality: 5, feedback: 'MID', blocked: false, source: 'score_error' }
+    return { ...heuristicScore(text), source: 'score_error' }
   }
 }
 
@@ -749,6 +795,7 @@ function finishRound(io, battle, round) {
   if (!scores || scores.player1 == null || scores.player2 == null) return
 
   clearTurnTimer(battle.id)
+  clearHandoffTimer(battle)
 
   const roundWinner = scores.player1 > scores.player2 ? 0
     : scores.player2 > scores.player1 ? 1

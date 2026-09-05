@@ -22,12 +22,97 @@ const TOXICITY_RE = /\b(nigg|faggot|retard|kys|kill yourself|doxx?|ssn|social se
 const FAMILY_ATTACK_RE = /\b(your (mom|mother|dad|father|grandma|grandpa|sister|brother)\b.*(die|dead|rape|kill|fuck))/i
 const KEYSMASH_RE = /^(?:(.)\1{4,}|[asdfghjkl]{8,}|[qwerty]{8,})$/i
 
+/** Common roast / English content words — gibberish rarely hits these. */
+const REAL_WORD_HINTS = new Set([
+  'you', 'your', 'youre', 'yours', 'the', 'and', 'that', 'like', 'look', 'looks',
+  'face', 'fit', 'drip', 'bar', 'bars', 'mic', 'flow', 'cap', 'mid', 'trash',
+  'mom', 'dad', 'boy', 'girl', 'bro', 'dude', 'man', 'guy', 'fake', 'weak',
+  'still', 'never', 'always', 'even', 'just', 'when', 'from', 'with', 'this',
+  'what', 'why', 'how', 'get', 'got', 'aint', 'dont', 'cant', 'wack', 'lame',
+  'ugly', 'broke', 'poor', 'rich', 'talk', 'sound', 'smell', 'dress', 'style',
+])
+
 function labelForMarks(marks) {
   if (marks >= 9) return 'DESTROYED'
   if (marks >= 7) return 'SPICY'
   if (marks >= 5) return 'MID'
   if (marks >= 3) return 'WEAK'
   return 'TRASH'
+}
+
+/**
+ * Detect random keyboard / nonsense that is not a roast.
+ */
+function looksLikeGibberish(text) {
+  const trimmed = (text || '').trim()
+  if (!trimmed) return true
+
+  const letters = trimmed.replace(/[^a-zA-Z]/g, '')
+  if (letters.length < 5) return true
+
+  const words = trimmed.toLowerCase().match(/[a-z']+/g) || []
+  if (words.length === 0) return true
+
+  const vowels = (letters.match(/[aeiouy]/gi) || []).length
+  if (letters.length >= 8 && vowels / letters.length < 0.18) return true
+
+  const noVowel = words.filter((w) => w.length >= 4 && !/[aeiouy]/.test(w))
+  if (words.length >= 2 && noVowel.length >= Math.ceil(words.length * 0.5)) return true
+
+  const realHits = words.filter((w) => REAL_WORD_HINTS.has(w) || w.length <= 2).length
+  const longWeird = words.filter((w) => w.length >= 5 && !REAL_WORD_HINTS.has(w))
+  // Mostly long unknown tokens with almost no real glue words → random mash
+  if (words.length >= 3 && realHits === 0 && longWeird.length >= 2) return true
+  if (words.length >= 4 && realHits <= 1 && longWeird.length >= words.length - 1) return true
+
+  // High unique-char entropy in a short string without spaces (asdfgh style)
+  const compact = trimmed.replace(/\s+/g, '')
+  if (compact.length >= 10 && !/\s/.test(trimmed) && KEYSMASH_RE.test(compact)) return true
+
+  return false
+}
+
+/**
+ * Offline / timeout fallback — never invent a generous MID 5.
+ */
+function heuristicScore(text) {
+  const pre = precheckRoast(text)
+  if (pre) return pre
+
+  const trimmed = (text || '').trim()
+  const words = trimmed.toLowerCase().match(/[a-z']+/g) || []
+
+  if (looksLikeGibberish(trimmed)) {
+    return {
+      marks: 1,
+      quality: 1,
+      feedback: 'TRASH',
+      criteria: null,
+      blocked: false,
+      source: 'heuristic',
+    }
+  }
+
+  if (words.length < 5) {
+    return {
+      marks: 2,
+      quality: 2,
+      feedback: 'WEAK',
+      criteria: null,
+      blocked: false,
+      source: 'heuristic',
+    }
+  }
+
+  // Mild benefit of the doubt only for longer English-ish lines when judge is down
+  return {
+    marks: 3,
+    quality: 3,
+    feedback: 'WEAK',
+    criteria: null,
+    blocked: false,
+    source: 'heuristic',
+  }
 }
 
 /**
@@ -72,6 +157,17 @@ function precheckRoast(text, { lastRoast } = {}) {
     }
   }
 
+  if (looksLikeGibberish(trimmed)) {
+    return {
+      marks: 1,
+      quality: 1,
+      feedback: 'TRASH',
+      criteria: null,
+      blocked: false,
+      source: 'precheck',
+    }
+  }
+
   if (lastRoast) {
     const a = normalizeForDup(trimmed)
     const b = normalizeForDup(lastRoast)
@@ -109,10 +205,11 @@ function similarity(a, b) {
 const JUDGE_PROMPT = `You are a Gen Z roast-battle judge. Score this roast from 0 to 10 (absolute marks for THIS message only).
 Rubric: Originality 35%, Impact 30%, Punch/craft 20%, Cultural fluency 15%.
 Wit over pure meanness. Unoriginal brutality caps around 4.
+CRITICAL: Random letters, keyboard smash, nonsense words, or non-roasts MUST score 0–2 (LABEL: TRASH or LAZY). Do NOT give MID/5 for gibberish.
 
 OUTPUT — exactly these lines:
 SCORE: [0-10]
-LABEL: [DESTROYED|SPICY|FIRE|MID|WEAK|TRASH]
+LABEL: [DESTROYED|SPICY|FIRE|MID|WEAK|TRASH|LAZY]
 `
 
 const REFEREE_PROMPT = `You are a comedy-club roast battle REFEREE.
@@ -124,13 +221,15 @@ CRITERIA (each 0–10):
 3. ORIGINALITY — Unexpected angle / wordplay vs recycled insults
 4. CROWD — Would a roast audience laugh or go "ooh"?
 
+CRITICAL: Random letters, keyboard smash, nonsense, or non-roasts: all criteria 0–2, QUALITY 0–2, FEEDBACK TRASH. Never give MID/~5 for gibberish.
+
 OUTPUT — exactly these lines, nothing else:
 SPECIFICITY: [0-10]
 CRAFT: [0-10]
 ORIGINALITY: [0-10]
 CROWD: [0-10]
 QUALITY: [0-10 average]
-FEEDBACK: [one of: FIRE WEAK SAVAGE CREATIVE MID COOKING DESTROYED BRUTAL WACK SPICY TRASH]
+FEEDBACK: [one of: FIRE WEAK SAVAGE CREATIVE MID COOKING DESTROYED BRUTAL WACK SPICY TRASH LAZY]
 `
 
 let judgeAvailable = null
@@ -225,7 +324,11 @@ function round1(n) {
 function parseJudge(text) {
   let marks = parseNum(/SCORE:\s*(-?\d+(?:\.\d+)?)/i, text, NaN)
   if (Number.isNaN(marks)) {
-    marks = parseNum(/QUALITY:\s*(-?\d+(?:\.\d+)?)/i, text, 5)
+    marks = parseNum(/QUALITY:\s*(-?\d+(?:\.\d+)?)/i, text, NaN)
+  }
+  // Missing score → do not default to generous 5
+  if (Number.isNaN(marks)) {
+    return heuristicScore(text || '')
   }
   marks = round1(clamp(marks, 0, 10))
 
@@ -247,10 +350,11 @@ function parseJudge(text) {
 }
 
 function parseReferee(text) {
-  const specificity = clamp(parseNum(/SPECIFICITY:\s*(-?\d+(?:\.\d+)?)/i, text, 5), 0, 10)
-  const craft = clamp(parseNum(/CRAFT:\s*(-?\d+(?:\.\d+)?)/i, text, 5), 0, 10)
-  const originality = clamp(parseNum(/ORIGINALITY:\s*(-?\d+(?:\.\d+)?)/i, text, 5), 0, 10)
-  const crowd = clamp(parseNum(/CROWD:\s*(-?\d+(?:\.\d+)?)/i, text, 5), 0, 10)
+  // Missing lines default low — never inflate to MID 5
+  const specificity = clamp(parseNum(/SPECIFICITY:\s*(-?\d+(?:\.\d+)?)/i, text, 2), 0, 10)
+  const craft = clamp(parseNum(/CRAFT:\s*(-?\d+(?:\.\d+)?)/i, text, 2), 0, 10)
+  const originality = clamp(parseNum(/ORIGINALITY:\s*(-?\d+(?:\.\d+)?)/i, text, 2), 0, 10)
+  const crowd = clamp(parseNum(/CROWD:\s*(-?\d+(?:\.\d+)?)/i, text, 2), 0, 10)
 
   let quality = parseNum(/QUALITY:\s*(-?\d+(?:\.\d+)?)/i, text, NaN)
   if (Number.isNaN(quality)) {
@@ -481,6 +585,8 @@ module.exports = {
   applyDelta,
   addMarks,
   precheckRoast,
+  heuristicScore,
+  looksLikeGibberish,
   parseReferee,
   parseJudge,
   labelForMarks,

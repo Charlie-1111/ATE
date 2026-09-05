@@ -34,7 +34,15 @@ Clip / challenge post
 
 Optimize for: **time-to-first-roast** and **% of Practice players who tap Find Match within 24h**.
 
-## Launch week playbook
+## This week — start getting people playing (do these first)
+
+1. **Ship a 15s clip today:** home arena + BGM → Practice → type a roast → score stamp. Post to TikTok/Reels/Shorts with link in bio.
+2. **Pin Practice, not Find Match:** cold traffic should hit AI practice so the first roast is instant; CTA to Find Match after one win/loss.
+3. **Run a 1-hour “ATE hour”:** Discord/IG story — two people queue freestyle Bo3 at the same time; host spectates and clips the best bars.
+4. **Daily topic prompt:** post one roast topic each morning; ask followers to reply with their bar, then show the in-game score.
+5. **Roommate / campus challenge:** “ATE my friend” — first 20 pairs that finish a real match get a shoutout + free premium char code when Stripe is live.
+
+Full playbook: see launch week table and metrics below.
 
 | Day | Action |
 |-----|--------|

@@ -16,34 +16,49 @@ export default function RoastInput({ isMyTurn, onSend, disabled }) {
   const onSendRef = useRef(onSend)
   const turnEpochRef = useRef(0)
   const acceptedRef = useRef(false)
+  const lockedRoundRef = useRef(null)
 
   const lastRoastError = useBattleStore((s) => s.lastRoastError)
   const roastAcceptedAt = useBattleStore((s) => s.roastAcceptedAt)
   const countdownSec = useBattleStore((s) => s.countdownSec)
   const turnLive = useBattleStore((s) => s.turnLive)
+  const currentRound = useBattleStore((s) => s.currentRound)
 
-  const inCountdown = isMyTurn && !turnLive && countdownSec > 0
-  const canType = isMyTurn && turnLive && !disabled
+  const alreadySentThisRound = lockedRoundRef.current === currentRound
+  const inCountdown = isMyTurn && !turnLive && countdownSec > 0 && !alreadySentThisRound
+  const canType = isMyTurn && turnLive && !disabled && !alreadySentThisRound
 
   useEffect(() => {
     onSendRef.current = onSend
   }, [onSend])
 
   useEffect(() => {
-    if (roastAcceptedAt) acceptedRef.current = true
+    if (roastAcceptedAt) {
+      acceptedRef.current = true
+      lockedRoundRef.current = useBattleStore.getState().currentRound
+      submittedRef.current = true
+      setSubmitted(true)
+    }
   }, [roastAcceptedAt])
 
   useEffect(() => {
     if (!lastRoastError || !isMyTurn) return
+    // Keep lock if we already successfully locked this round
+    if (lockedRoundRef.current === currentRound) return
     submittedRef.current = false
     acceptedRef.current = false
     setSubmitted(false)
-  }, [lastRoastError, isMyTurn])
+  }, [lastRoastError, isMyTurn, currentRound])
 
-  // Reset when our turn starts (before countdown / live)
+  // Reset only when a NEW round starts and it is our turn (one roast per round)
   useEffect(() => {
     clearInterval(timerRef.current)
     if (!isMyTurn) return
+    if (lockedRoundRef.current === currentRound) {
+      submittedRef.current = true
+      setSubmitted(true)
+      return
+    }
 
     turnEpochRef.current += 1
     submittedRef.current = false
@@ -53,12 +68,12 @@ export default function RoastInput({ isMyTurn, onSend, disabled }) {
     setTimeLeft(TURN_TIME)
 
     return () => clearInterval(timerRef.current)
-  }, [isMyTurn])
+  }, [isMyTurn, currentRound])
 
   // 20s clock only after server says turn_live
   useEffect(() => {
     clearInterval(timerRef.current)
-    if (!canType || submitted) return
+    if (!canType || submitted || alreadySentThisRound) return
 
     const epoch = turnEpochRef.current
     setTimeLeft(TURN_TIME)
@@ -69,8 +84,9 @@ export default function RoastInput({ isMyTurn, onSend, disabled }) {
         if (epoch !== turnEpochRef.current) return prev
         if (prev <= 1) {
           clearInterval(timerRef.current)
-          if (!submittedRef.current && !acceptedRef.current) {
+          if (!submittedRef.current && !acceptedRef.current && lockedRoundRef.current !== currentRound) {
             submittedRef.current = true
+            lockedRoundRef.current = currentRound
             setSubmitted(true)
             onSendRef.current('', true)
           }
@@ -84,17 +100,18 @@ export default function RoastInput({ isMyTurn, onSend, disabled }) {
       clearTimeout(focusId)
       clearInterval(timerRef.current)
     }
-  }, [canType, submitted])
+  }, [canType, submitted, alreadySentThisRound, currentRound])
 
   const handleSubmit = useCallback(() => {
     if (!text.trim() || submitted || disabled || !turnLive) return
-    if (submittedRef.current) return
+    if (submittedRef.current || lockedRoundRef.current === currentRound) return
     clearInterval(timerRef.current)
     submittedRef.current = true
+    lockedRoundRef.current = currentRound
     setSubmitted(true)
     onSendRef.current(text.trim(), false)
     setText('')
-  }, [text, submitted, disabled, turnLive])
+  }, [text, submitted, disabled, turnLive, currentRound])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -116,7 +133,7 @@ export default function RoastInput({ isMyTurn, onSend, disabled }) {
       : 'bg-[var(--ate-gold)]'
 
   const timerPercent = (timeLeft / TURN_TIME) * 100
-  const inputLocked = submitted || disabled || !turnLive
+  const inputLocked = submitted || disabled || !turnLive || alreadySentThisRound
   const timerIcon = timeLeft <= 10 ? UI.timerFlame : UI.timerClock
 
   return (
