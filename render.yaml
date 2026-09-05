@@ -1,0 +1,18 @@
+# Free Render deploy — no credit card.
+# One-click: https://render.com/deploy?repo=https://github.com/Charlie-1111/ATE
+# Sleeps after ~15 min idle; first request may take 30–60s to wake.
+
+services:
+  - type: web
+    name: ate
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
