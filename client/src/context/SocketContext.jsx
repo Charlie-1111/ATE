@@ -20,8 +20,24 @@ export function SocketProvider({ children }) {
     }
   }, [])
 
+  function waitUntilConnected(timeoutMs = 8000) {
+    if (socket.connected) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      const t = setTimeout(() => {
+        socket.off('connect', onConnect)
+        resolve(false)
+      }, timeoutMs)
+      function onConnect() {
+        clearTimeout(t)
+        resolve(true)
+      }
+      socket.once('connect', onConnect)
+    })
+  }
+
   function join(userId) {
     connectSocket(userId)
+    return waitUntilConnected(8000)
   }
 
   function leave() {
@@ -30,7 +46,7 @@ export function SocketProvider({ children }) {
   }
 
   return (
-    <SocketContext.Provider value={{ socket, connected, join, leave }}>
+    <SocketContext.Provider value={{ socket, connected, join, leave, waitUntilConnected }}>
       {children}
     </SocketContext.Provider>
   )

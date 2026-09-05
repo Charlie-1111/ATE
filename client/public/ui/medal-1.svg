@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200" role="img" aria-label="Rank 1">
+  <g stroke="#000000" stroke-width="9" stroke-linejoin="miter">
+    <polygon points="34,4 72,4 84,70 52,70" fill="#C1121F"/>
+    <polygon points="126,4 88,4 76,70 108,70" fill="#C1121F"/>
+  </g>
+  <polygon points="80,58 140,96 140,158 80,196 20,158 20,96" fill="#FFD700" stroke="#000000" stroke-width="10" stroke-linejoin="miter"/>
+  <polygon points="80,76 124,104 124,150 80,178 36,150 36,104" fill="none" stroke="#000000" stroke-width="5" opacity="0.6"/>
+  <path d="M77.48193359375 146.0V110.24609375Q76.53271484375 111.3798828125 74.87158203125 112.07861328125Q73.21044921875 112.77734375 71.73388671875 112.77734375V105.3681640625Q73.13134765625 105.1572265625 74.73974609375 104.45849609375Q76.34814453125 103.759765625 77.732421875 102.53369140625Q79.11669921875 101.3076171875 79.85498046875 99.5673828125H87.31689453125V146.0Z" fill="#000000"/>
+  <rect x="54" y="134" width="13" height="2.2" fill="#000000" opacity="0.22" transform="rotate(5 54 134)"/>
+  <rect x="37" y="91" width="21" height="1.5" fill="#000000" opacity="0.22" transform="rotate(-11 37 91)"/>
+  <rect x="130" y="128" width="21" height="2.0" fill="#000000" opacity="0.22" transform="rotate(6 130 128)"/>
+  <rect x="45" y="141" width="22" height="2.0" fill="#000000" opacity="0.22" transform="rotate(10 45 141)"/>
+  <rect x="97" y="95" width="20" height="2.2" fill="#000000" opacity="0.22" transform="rotate(-8 97 95)"/>
+  <rect x="33" y="159" width="15" height="2.4" fill="#000000" opacity="0.22" transform="rotate(15 33 159)"/>
+  <rect x="101" y="164" width="13" height="2.6" fill="#000000" opacity="0.22" transform="rotate(-2 101 164)"/>
+  <rect x="124" y="160" width="8" height="1.3" fill="#000000" opacity="0.22" transform="rotate(-11 124 160)"/>
+  <rect x="127" y="125" width="17" height="1.6" fill="#000000" opacity="0.22" transform="rotate(0 127 125)"/>
+  <rect x="69" y="118" width="17" height="2.2" fill="#000000" opacity="0.22" transform="rotate(16 69 118)"/>
+  <rect x="98" y="164" width="21" height="3.0" fill="#000000" opacity="0.22" transform="rotate(7 98 164)"/>
+  <rect x="46" y="159" width="23" height="2.8" fill="#000000" opacity="0.22" transform="rotate(3 46 159)"/>
+  <rect x="101" y="107" width="21" height="2.1" fill="#000000" opacity="0.22" transform="rotate(-9 101 107)"/>
+  <rect x="36" y="158" width="24" height="1.2" fill="#000000" opacity="0.22" transform="rotate(12 36 158)"/>
+</svg>

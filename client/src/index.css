@@ -1,3 +1,6 @@
+@import '@fontsource/anton/index.css';
+@import './styles/ate-tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,16 +12,53 @@
 }
 
 body {
-  background-color: #000000;
-  color: #ffffff;
-  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--ate-black, #000);
+  color: var(--ate-bone, #EDE3CF);
+  font-family: 'Oswald', 'Anton', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  letter-spacing: 0.04em;
+}
+
+.font-display,
+h1, h2, h3 {
+  font-family: 'Anton', 'Bebas Neue', 'Archivo Black', Impact, sans-serif;
+  letter-spacing: 0.08em;
+  font-weight: 400;
+}
+
+.font-street {
+  font-family: 'Permanent Marker', 'Archivo Black', cursive;
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* Blank button skins — live text on top (ignore baked FIND MATCH paths visually via padding) */
+.ate-btn-live {
+  background: url('/ui/btn-gold.svg') no-repeat center / 100% 100%;
+  border: 0;
+  color: var(--ate-black);
+  font-family: 'Anton', Impact, 'Arial Black', sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1.1rem 1.5rem 1.4rem;
+  width: 100%;
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+.ate-btn-live:active {
+  background-image: url('/ui/btn-gold-pressed.svg');
+  transform: translateY(4px);
+}
+.ate-btn-live--dark {
+  background-image: url('/ui/btn-dark.svg');
+  color: var(--ate-gold);
+}
+.ate-btn-live--dark:active {
+  background-image: url('/ui/btn-dark-pressed.svg');
 }
 
 ::-webkit-scrollbar {
@@ -30,12 +70,8 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #FFD700;
+  background: var(--ate-gold, #FFD700);
   border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #FFA500;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -44,4 +80,5 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  .ate-btn-live { transition: none; }
 }

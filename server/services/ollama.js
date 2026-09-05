@@ -320,7 +320,7 @@ async function generateRoast(topic = null) {
   return text
 }
 
-const FALLBACK_TOPICS = [
+const TOPIC_POOL = [
   'bad fashion sense',
   'school cafeteria food',
   'WiFi that never works',
@@ -331,28 +331,145 @@ const FALLBACK_TOPICS = [
   'reality TV addiction',
   'overpriced coffee',
   'being chronically late',
+  'dry shampoo addiction',
+  'unread email pile',
+  'parking lot drama',
+  'airline middle seats',
+  'roommate dishes',
+  'slow walkers',
+  'group chat ghosts',
+  'playlist gatekeepers',
+  'office microwave fish',
+  'selfie lighting',
+  'expired milk gambles',
+  'IKEA furniture rage',
+  'printer paper jams',
+  'Monday alarms',
+  'spoiler addicts',
+  'gas station sushi',
+  'loud phone calls',
+  'wrong Zoom backgrounds',
+  'socks with sandals',
+  'unlimited breadsticks',
+  'dating app bios',
+  'crypto bros',
+  'airpods everywhere',
+  'vending machine theft',
+  'elevator small talk',
+  'side hustle burnout',
+  'influencer voice',
+  'cold brew snobs',
+  'karaoke confidence',
+  'fantasy football',
+  'road trip playlists',
+  'hotel pillow wars',
+  'shared Netflix profiles',
+  'food delivery tips',
+  'bathroom selfie culture',
+  'conference call mute',
+  'thrift flip fails',
+  'gym mirror ego',
+  'autocorrect betrayal',
+  'sunday scaries',
 ]
 
+/** Recently dealt topics — avoid repeats across matches. */
+const recentTopics = []
+const RECENT_LIMIT = 12
+
+function normalizeTopic(t) {
+  return String(t || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isTooSimilar(a, b) {
+  const na = normalizeTopic(a)
+  const nb = normalizeTopic(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  // share a distinctive word (4+ chars) → treat as same lane
+  const wa = new Set(na.split(' ').filter((w) => w.length >= 4))
+  const wb = nb.split(' ').filter((w) => w.length >= 4)
+  return wb.some((w) => wa.has(w))
+}
+
+function rememberTopic(topic) {
+  recentTopics.push(normalizeTopic(topic))
+  while (recentTopics.length > RECENT_LIMIT) recentTopics.shift()
+}
+
+function pickFromPool() {
+  const fresh = TOPIC_POOL.filter(
+    (t) => !recentTopics.some((r) => isTooSimilar(t, r)),
+  )
+  const pool = fresh.length ? fresh : TOPIC_POOL
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+/**
+ * Prefer a curated rotating pool so topics stay varied.
+ * Ollama is optional spice — rejected if it repeats a recent theme.
+ */
 async function generateTopic() {
+  let topic = pickFromPool()
+
   try {
     const ollama = getOllama()
+    const avoid = recentTopics.slice(-5).join(', ') || 'none'
     const response = await ollama.chat({
       model: FALLBACK_MODEL,
       messages: [{
         role: 'user',
         content: `Invent ONE short roast-battle topic (2–5 words). Everyday life, comedy-club safe.
-No quotes, no punctuation except spaces/hyphens. Examples: bad fashion, cafeteria food, WiFi lag.
+No quotes. Do NOT use adulting, adulting is overrated, or anything like: ${avoid}.
+Examples: cafeteria food, WiFi lag, gym selfies, printer rage.
 Topic:`,
       }],
       stream: false,
-      options: { temperature: 0.95, num_predict: 20 },
+      options: { temperature: 1.1, num_predict: 16 },
     })
-    let topic = (response.message.content || '').trim()
-    topic = topic.replace(/^["']|["']$/g, '').replace(/^Topic:\s*/i, '').split('\n')[0].trim()
-    if (topic.length < 3 || topic.length > 48) throw new Error('bad topic')
-    return topic
+    let candidate = (response.message.content || '').trim()
+    candidate = candidate
+      .replace(/^["']|["']$/g, '')
+      .replace(/^Topic:\s*/i, '')
+      .split('\n')[0]
+      .trim()
+    if (
+      candidate.length >= 3 &&
+      candidate.length <= 48 &&
+      !recentTopics.some((r) => isTooSimilar(candidate, r)) &&
+      !/adulting/i.test(candidate)
+    ) {
+      topic = candidate
+    }
   } catch {
-    return FALLBACK_TOPICS[Math.floor(Math.random() * FALLBACK_TOPICS.length)]
+    // keep pool pick
+  }
+
+  rememberTopic(topic)
+  return topic
+}
+
+/** Ping Ollama so the model is warm before the first real score. */
+async function warmUp() {
+  try {
+    const ollama = getOllama()
+    const model = FALLBACK_MODEL
+    console.log(`[Ollama] Warming up ${model}...`)
+    await ollama.chat({
+      model,
+      messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
+      stream: false,
+      options: { temperature: 0, num_predict: 4 },
+    })
+    console.log('[Ollama] Warm-up complete')
+    return true
+  } catch (err) {
+    console.warn('[Ollama] Warm-up failed:', err.message)
+    return false
   }
 }
 
@@ -360,6 +477,7 @@ module.exports = {
   scoreRoast,
   generateRoast,
   generateTopic,
+  warmUp,
   applyDelta,
   addMarks,
   precheckRoast,

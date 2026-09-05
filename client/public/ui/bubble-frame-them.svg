@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" width="480" height="200"
+     preserveAspectRatio="none" role="img" aria-label="Chat bubble frame">
+  <polygon points="10,2 474,8 472,150 440,192 4,180" fill="#0B0B0B" stroke="#C1121F" stroke-width="8" stroke-linejoin="miter"/>
+  <polygon points="440,192 472,150 406,166" fill="#C1121F"/>
+</svg>

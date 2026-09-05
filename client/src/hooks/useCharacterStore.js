@@ -100,19 +100,26 @@ export const useCharacterStore = create((set, get) => ({
   unlockPremium: (id) => {
     const c = getCharacter(id)
     if (c.rarity !== 'premium') return false
-    const { purchasedIds, rankedWins, characterId } = get()
-    if (purchasedIds.includes(c.id)) {
-      persistId(c.id)
-      set({ characterId: c.id })
-      return true
-    }
+    const { purchasedIds, rankedWins } = get()
+    // Unlock only — shop requires tick/confirm to equip
+    if (purchasedIds.includes(c.id)) return true
     const purchased = [...purchasedIds, c.id]
     const unlockedIds = mergeUnlocked(rankedWins, purchased)
     persistList(PURCHASED_KEY, purchased)
     persistList(UNLOCKED_KEY, unlockedIds)
-    persistId(c.id)
-    set({ purchasedIds: purchased, unlockedIds, characterId: c.id })
+    set({ purchasedIds: purchased, unlockedIds })
     return true
+  },
+
+  /** Merge server purchase list (after login / Stripe return). */
+  syncPurchases: (ids) => {
+    const list = Array.isArray(ids) ? ids : []
+    const { purchasedIds, rankedWins } = get()
+    const purchased = [...new Set([...purchasedIds, ...list])]
+    const unlockedIds = mergeUnlocked(rankedWins, purchased)
+    persistList(PURCHASED_KEY, purchased)
+    persistList(UNLOCKED_KEY, unlockedIds)
+    set({ purchasedIds: purchased, unlockedIds })
   },
 
   /** Sync ranked wins from leaderboard profile (or after a PvP win). */

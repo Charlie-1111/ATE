@@ -11,6 +11,7 @@
     "avatar:normalize": "node scripts/normalize-avatar-landmarks.mjs"
   },
   "dependencies": {
+    "@fontsource/anton": "^5.3.0",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "axios": "^1.7.9",

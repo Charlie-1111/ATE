@@ -1,90 +1,207 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { useGLTF, useAnimations, OrbitControls, Center } from '@react-three/drei'
-import { characterModelUrl, DEFAULT_CHARACTER_ID, getCharacter } from '../../lib/characterCatalog.js'
+import { useEffect, useRef, useState } from 'react'
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import {
+  characterModelUrl,
+  DEFAULT_CHARACTER_ID,
+  getCharacter,
+  resolveClipName,
+} from '../../lib/characterCatalog.js'
 
-function CharacterModel({ characterId, animation = 'idle' }) {
-  const id = getCharacter(characterId).id
-  const url = characterModelUrl(id)
-  const group = useRef()
-  const { scene, animations } = useGLTF(url)
-  const { actions, names } = useAnimations(animations, group)
-  const cloned = useMemo(() => scene.clone(true), [scene])
+const loader = new GLTFLoader()
 
-  useEffect(() => {
-    const want = animation || 'idle'
-    const name = names.includes(want)
-      ? want
-      : names.includes('idle')
-        ? 'idle'
-        : names[0]
-    if (!name || !actions[name]) return undefined
-    const action = actions[name]
-    action.reset().fadeIn(0.2).play()
-    return () => {
-      action.fadeOut(0.15)
-    }
-  }, [actions, names, animation])
-
-  useFrame((_, delta) => {
-    // keep mixer advancing via drei useAnimations
-    void delta
-  })
-
+function FallbackMark({ name, size, detail }) {
   return (
-    <group ref={group}>
-      <primitive object={cloned} />
-    </group>
-  )
-}
-
-function FallbackBox() {
-  return (
-    <mesh>
-      <boxGeometry args={[0.6, 1.2, 0.4]} />
-      <meshStandardMaterial color="#FFD700" />
-    </mesh>
+    <div
+      className="w-full h-full flex flex-col items-center justify-center gap-1 bg-[#1c1c28] text-[var(--ate-gold,#FFD700)] px-1"
+      style={{ fontSize: Math.max(12, size * 0.22) }}
+    >
+      <span className="font-display uppercase tracking-wider leading-none">{name.slice(0, 2)}</span>
+      {size >= 72 && (
+        <span className="font-sans text-[10px] uppercase tracking-widest text-[var(--ate-grey,#5A5A5A)] truncate max-w-full">
+          {name}
+        </span>
+      )}
+      {detail && (
+        <span className="text-[8px] text-red-400 font-mono px-1 text-center leading-tight">{detail}</span>
+      )}
+    </div>
   )
 }
 
 /**
- * GLB character viewer. `animation`: idle | roast | hit | victory
+ * Vanilla Three.js GLB viewer.
+ * `live={false}` → name card only (leaderboard / idle grid).
  */
 export default function CharacterViewer({
   characterId = DEFAULT_CHARACTER_ID,
   animation = 'idle',
   size = 128,
   className = '',
-  interactive = false,
+  live = true,
 }) {
-  const id = getCharacter(characterId).id
+  const char = getCharacter(characterId)
+  const wrapRef = useRef(null)
+  const canvasRef = useRef(null)
+  const [status, setStatus] = useState(live ? 'loading' : 'idle')
+  const [err, setErr] = useState('')
+  const animRef = useRef(animation)
+  animRef.current = animation
+
+  useEffect(() => {
+    if (!live) return undefined
+
+    let disposed = false
+    let raf = 0
+    let mixer = null
+    let renderer
+    let scene
+    let camera
+    let root = null
+
+    const canvas = canvasRef.current
+    if (!canvas) {
+      setStatus('error')
+      setErr('no canvas')
+      return undefined
+    }
+
+    try {
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        alpha: false,
+        powerPreference: 'default',
+      })
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
+      renderer.setSize(size, size, false)
+      renderer.setClearColor(0x1c1c28, 1)
+      if ('outputColorSpace' in renderer) {
+        renderer.outputColorSpace = THREE.SRGBColorSpace
+      }
+
+      scene = new THREE.Scene()
+      camera = new THREE.PerspectiveCamera(35, 1, 0.05, 100)
+      camera.position.set(0, 0.15, 2.6)
+      camera.lookAt(0, 0.05, 0)
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.85))
+      const key = new THREE.DirectionalLight(0xffffff, 1.8)
+      key.position.set(2.5, 4, 3)
+      scene.add(key)
+      const fill = new THREE.DirectionalLight(0xfff0dd, 0.55)
+      fill.position.set(-2, 1.5, 2)
+      scene.add(fill)
+      const rim = new THREE.DirectionalLight(0xffd700, 0.35)
+      rim.position.set(0, 2, -3)
+      scene.add(rim)
+
+      const url = characterModelUrl(char.id)
+      loader.load(
+        url,
+        (gltf) => {
+          if (disposed) return
+          // SkeletonUtils keeps skinned meshes / bones intact across multi-canvas
+          root = cloneSkinned(gltf.scene)
+          root.traverse((obj) => {
+            obj.frustumCulled = false
+          })
+
+          root.updateMatrixWorld(true)
+          const box = new THREE.Box3().setFromObject(root)
+          if (!box.isEmpty()) {
+            const size3 = box.getSize(new THREE.Vector3())
+            const center = box.getCenter(new THREE.Vector3())
+            root.position.set(-center.x, -center.y, -center.z)
+            root.scale.setScalar(1.55 / Math.max(size3.y, 0.01))
+            root.updateMatrixWorld(true)
+            const box2 = new THREE.Box3().setFromObject(root)
+            root.position.y += -box2.min.y - (box2.max.y - box2.min.y) * 0.5
+            root.updateMatrixWorld(true)
+          }
+
+          scene.add(root)
+
+          if (gltf.animations?.length) {
+            mixer = new THREE.AnimationMixer(root)
+            const clips = Object.fromEntries(gltf.animations.map((c) => [c.name, c]))
+            const clipName = resolveClipName(animRef.current || 'idle', clips)
+            const clip = (clipName && clips[clipName]) || clips.idle || gltf.animations[0]
+            if (clip) mixer.clipAction(clip).play()
+          }
+          setStatus('ready')
+          setErr('')
+        },
+        undefined,
+        (e) => {
+          if (disposed) return
+          console.warn('[CharacterViewer] load failed', e)
+          setStatus('error')
+          setErr(String(e?.message || e || 'load failed'))
+        },
+      )
+
+      const clock = new THREE.Clock()
+      const tick = () => {
+        if (disposed) return
+        mixer?.update(clock.getDelta())
+        renderer.render(scene, camera)
+        raf = requestAnimationFrame(tick)
+      }
+      raf = requestAnimationFrame(tick)
+    } catch (e) {
+      console.warn('[CharacterViewer] init failed', e)
+      setStatus('error')
+      setErr(String(e?.message || e))
+    }
+
+    return () => {
+      disposed = true
+      cancelAnimationFrame(raf)
+      mixer?.stopAllAction()
+      if (root && scene) {
+        scene.remove(root)
+        root.traverse((obj) => {
+          obj.geometry?.dispose?.()
+          if (obj.material) {
+            if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose?.())
+            else obj.material.dispose?.()
+          }
+        })
+      }
+      renderer?.dispose()
+    }
+  }, [char.id, live, size])
+
+  if (!live) {
+    return (
+      <div
+        className={`overflow-hidden border-2 border-black ${className}`}
+        style={{ width: size, height: size }}
+      >
+        <FallbackMark name={char.name} size={size} />
+      </div>
+    )
+  }
 
   return (
     <div
-      className={`overflow-hidden bg-[#1a1a24] border-2 border-black ${className}`}
+      ref={wrapRef}
+      className={`overflow-hidden bg-[#1c1c28] border-2 border-black relative ${className}`}
       style={{ width: size, height: size }}
     >
-      <Canvas
-        camera={{ position: [0, 1.1, 2.4], fov: 35 }}
-        dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: true }}
-        style={{ width: '100%', height: '100%' }}
-      >
-        <ambientLight intensity={0.85} />
-        <directionalLight position={[3, 5, 2]} intensity={1.1} />
-        <directionalLight position={[-2, 2, -1]} intensity={0.35} />
-        <Suspense fallback={<FallbackBox />}>
-          <Center>
-            <CharacterModel characterId={id} animation={animation} />
-          </Center>
-        </Suspense>
-        {interactive && (
-          <OrbitControls enableZoom={false} enablePan={false} maxPolarAngle={Math.PI / 1.7} />
-        )}
-      </Canvas>
+      <canvas
+        ref={canvasRef}
+        width={size}
+        height={size}
+        style={{ width: '100%', height: '100%', display: 'block' }}
+      />
+      {status === 'error' && (
+        <div className="absolute inset-0">
+          <FallbackMark name={char.name} size={size} detail={err} />
+        </div>
+      )}
     </div>
   )
 }
-
-// Warm default so first paint is faster
-useGLTF.preload(characterModelUrl(DEFAULT_CHARACTER_ID))

@@ -3,6 +3,7 @@ import { useSocket } from '../context/SocketContext.jsx'
 import { useBattleStore } from './useBattleStore.js'
 import { useUserStore } from './useUserStore.js'
 import { useCharacterStore } from './useCharacterStore.js'
+import api from '../lib/api.js'
 
 export function useBattle(userId) {
   const { socket, connected, join } = useSocket()
@@ -28,6 +29,27 @@ export function useBattle(userId) {
       })
     })
 
+    socket.on('queued', (data) => {
+      const cur = useBattleStore.getState()
+      if (cur.status !== 'queued' && cur.status !== 'idle') return
+      useBattleStore.getState().setBattle({
+        status: 'queued',
+        myId: userId,
+        format: data.format || cur.format,
+        mode: data.mode || cur.mode,
+        queuePosition: data.position,
+        queueError: null,
+      })
+    })
+
+    socket.on('queue_error', (data) => {
+      useBattleStore.getState().setBattle({
+        status: 'idle',
+        myId: userId,
+        queueError: data.error || 'queue_failed',
+      })
+    })
+
     socket.on('opponent_typing', () => {
       store.setOpponentTyping(true)
     })
@@ -37,8 +59,9 @@ export function useBattle(userId) {
     })
 
     socket.on('roast_scored', (data) => {
-      const myId = store.myId
-      store.addMessage({
+      const myId = useBattleStore.getState().myId
+      const storeApi = useBattleStore.getState()
+      storeApi.addMessage({
         playerId: data.playerId,
         text: data.text,
         marks: data.marks ?? data.quality ?? data.score,
@@ -50,14 +73,20 @@ export function useBattle(userId) {
         isTimeout: data.isTimeout,
         blocked: data.blocked,
       })
-      store.setRoastResult(data)
-      store.setOpponentTyping(false)
+      storeApi.setRoastResult(data)
+      storeApi.setOpponentTyping(false)
+    })
+
+    socket.on('roast_accepted', () => {
+      useBattleStore.getState().noteRoastAccepted()
     })
 
     socket.on('timeout_penalty', () => {})
 
     socket.on('round_result', (data) => {
-      store.advanceRound({
+      const storeApi = useBattleStore.getState()
+      storeApi.setOpponentTyping(false)
+      storeApi.advanceRound({
         round: data.nextRound,
         myRoundWins: data.myRoundWins,
         opponentRoundWins: data.opponentRoundWins,
@@ -75,11 +104,6 @@ export function useBattle(userId) {
         myTotalScore: data.myTotalScore,
         opponentTotalScore: data.opponentTotalScore,
       })
-      // Ranked unlocks: bump local wins if we won a non-practice PvP (practice doesn't emit leaderboard)
-      if (data.winner === 'me' && data.countedForLeaderboard !== false) {
-        // Practice battles still emit battle_ended — server only records PvP.
-        // Client can't always tell; sync from API when possible.
-      }
     })
 
     socket.on('opponent_disconnected', () => {
@@ -88,39 +112,69 @@ export function useBattle(userId) {
 
     socket.on('roast_error', (data) => {
       console.error('[Roast] Error:', data.error)
+      useBattleStore.getState().noteRoastError()
     })
 
-    socket.on('your_turn', () => {
-      store.setTurn(true)
+    socket.on('your_turn', (data) => {
+      const storeApi = useBattleStore.getState()
+      storeApi.setOpponentTyping(false)
+      storeApi.setTurn(true)
+      if (data?.countdownSec) storeApi.setCountdown(data.countdownSec)
+    })
+
+    socket.on('turn_countdown', (data) => {
+      useBattleStore.getState().setCountdown(data?.seconds ?? 3)
+    })
+
+    socket.on('turn_live', () => {
+      useBattleStore.getState().setTurnLive()
     })
 
     socket.on('opponents_turn', () => {
-      store.setTurn(false)
+      useBattleStore.getState().setTurn(false)
     })
+
+    const onDisconnect = () => {
+      const cur = useBattleStore.getState()
+      if (cur.status === 'queued') {
+        cur.setBattle({
+          status: 'idle',
+          myId: userId,
+          format: cur.format,
+          mode: cur.mode,
+          queueError: 'disconnected',
+        })
+      }
+    }
+    socket.on('disconnect', onDisconnect)
 
     return () => {
       socket.off('match_found')
+      socket.off('queued')
+      socket.off('queue_error')
       socket.off('opponent_typing')
       socket.off('opponent_stopped_typing')
       socket.off('roast_scored')
+      socket.off('roast_accepted')
       socket.off('timeout_penalty')
       socket.off('round_result')
       socket.off('battle_ended')
       socket.off('opponent_disconnected')
       socket.off('roast_error')
       socket.off('your_turn')
+      socket.off('turn_countdown')
+      socket.off('turn_live')
       socket.off('opponents_turn')
+      socket.off('disconnect', onDisconnect)
     }
   }, [socket, userId, setRankedWins])
 
-  // Pull ranked wins from leaderboard profile for unlock gating
   useEffect(() => {
     if (!userId) return undefined
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`/api/leaderboard?limit=100`)
-        const data = await res.json()
+        const { data } = await api.get('/leaderboard', { params: { limit: 100 } })
         const me = (data.leaderboard || []).find((r) => r.id === userId)
         if (!cancelled && me && typeof me.wins === 'number') {
           const local = useCharacterStore.getState().rankedWins
@@ -142,47 +196,43 @@ export function useBattle(userId) {
     avatarId: characterId,
   }), [userId, displayName, characterId])
 
-  const findBattle = useCallback((format = 'best_of_3', mode = 'freestyle') => {
+  const findBattle = useCallback(async (format = 'best_of_3', mode = 'freestyle') => {
     const payload = queuePayload(format, mode)
-    const go = () => {
-      socket.emit('join_queue', payload)
-      store.setBattle({ status: 'queued', myId: userId, format, mode })
+    store.setBattle({ status: 'queued', myId: userId, format, mode, queueError: null })
+    const ok = socket.connected ? true : await join(userId)
+    if (!ok && !socket.connected) {
+      store.setBattle({ status: 'idle', myId: userId, format, mode, queueError: 'connect_failed' })
+      return
     }
-    if (!socket.connected) {
-      join(userId)
-      setTimeout(go, 500)
-    } else {
-      go()
-    }
-  }, [socket, userId, join, queuePayload])
+    socket.emit('join_queue', payload)
+  }, [socket, userId, join, queuePayload, store])
 
-  const findPractice = useCallback((format = 'best_of_3', mode = 'freestyle') => {
+  const findPractice = useCallback(async (format = 'best_of_3', mode = 'freestyle') => {
     const payload = queuePayload(format, mode)
-    const go = () => {
-      socket.emit('join_practice', payload)
-      store.setBattle({ status: 'queued', myId: userId, format, mode })
+    store.setBattle({ status: 'queued', myId: userId, format, mode, queueError: null })
+    const ok = socket.connected ? true : await join(userId)
+    if (!ok && !socket.connected) {
+      store.setBattle({ status: 'idle', myId: userId, format, mode, queueError: 'connect_failed' })
+      return
     }
-    if (!socket.connected) {
-      join(userId)
-      setTimeout(go, 500)
-    } else {
-      go()
-    }
-  }, [socket, userId, join, queuePayload])
+    socket.emit('join_practice', payload)
+  }, [socket, userId, join, queuePayload, store])
 
   const leaveQueue = useCallback(() => {
     socket.emit('leave_queue', { userId })
     store.reset()
-  }, [socket, userId])
+  }, [socket, userId, store])
 
   const sendRoast = useCallback((text, isTimeout = false) => {
+    const state = useBattleStore.getState()
     socket.emit('roast_sent', {
-      battleId: store.battleId,
+      battleId: state.battleId,
       text,
-      round: store.currentRound,
+      round: state.currentRound,
       isTimeout,
+      userId: state.myId,
     })
-  }, [socket, store.battleId, store.currentRound])
+  }, [socket])
 
   const startTyping = useCallback(() => {
     socket.emit('roast_typing', { battleId: store.battleId })

@@ -1,102 +1,18 @@
-[
-  {
-    "id": "vanta",
-    "name": "Vanta",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  },
-  {
-    "id": "solara",
-    "name": "Solara",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  },
-  {
-    "id": "brickz",
-    "name": "Brickz",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  },
-  {
-    "id": "nyx",
-    "name": "Nyx",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  },
-  {
-    "id": "riff",
-    "name": "Riff",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  },
-  {
-    "id": "koko",
-    "name": "Koko",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  },
-  {
-    "id": "torque",
-    "name": "Torque",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  },
-  {
-    "id": "velvet",
-    "name": "Velvet",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  },
-  {
-    "id": "riot",
-    "name": "Riot",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  },
-  {
-    "id": "echo",
-    "name": "Echo",
-    "animations": [
-      "idle",
-      "roast",
-      "hit",
-      "victory"
-    ]
-  }
-]
+{
+  "version": 2,
+  "pack": "rap-roster",
+  "default": "static",
+  "characters": [
+    { "id": "static", "file": "static.glb", "name": "Static", "tier": "street" },
+    { "id": "lil_grid", "file": "lil_grid.glb", "name": "Lil Grid", "tier": "street" },
+    { "id": "young_vector", "file": "young_vector.glb", "name": "Young Vector", "tier": "street" },
+    { "id": "poly_flow", "file": "poly_flow.glb", "name": "Poly Flow", "tier": "street" },
+    { "id": "static_drip", "file": "static_drip.glb", "name": "Static Drip", "tier": "drip" },
+    { "id": "grid_drip", "file": "grid_drip.glb", "name": "Lil Grid Drip", "tier": "drip" },
+    { "id": "vector_drip", "file": "vector_drip.glb", "name": "Young Vector Drip", "tier": "drip" },
+    { "id": "poly_drip", "file": "poly_drip.glb", "name": "Poly Flow Drip", "tier": "drip" },
+    { "id": "king_octane", "file": "king_octane.glb", "name": "King Octane", "tier": "icon" },
+    { "id": "nova_scott", "file": "nova_scott.glb", "name": "Nova Scott", "tier": "icon" }
+  ],
+  "clips": ["idle", "rap_verse", "dance"]
+}

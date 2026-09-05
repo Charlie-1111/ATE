@@ -29,9 +29,10 @@ export default {
         success: '#00FF00',
       },
       fontFamily: {
-        display: ['Impact', 'Arial Black', 'sans-serif'],
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['Courier New', 'monospace'],
+        display: ['"Bebas Neue"', '"Archivo Black"', 'Impact', 'sans-serif'],
+        sans: ['Oswald', 'system-ui', 'sans-serif'],
+        mono: ['"Rubik Mono One"', 'Oswald', 'monospace'],
+        street: ['"Permanent Marker"', '"Archivo Black"', 'cursive'],
       },
       borderWidth: {
         '4': '4px',

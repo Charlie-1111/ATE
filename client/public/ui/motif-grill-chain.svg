@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 620" width="120" height="620" role="img" aria-label="Chain and grill motif">
+  <g transform="translate(60,60)">
+    <path d="M-46,-24 h92 v22 q0,28 -46,36 q-46,-8 -46,-36 Z" fill="#FFD700" stroke="#000000" stroke-width="9" stroke-linejoin="miter"/>
+    <g stroke="#000000" stroke-width="6">
+      <path d="M-23,-24 V24 M0,-24 V32 M23,-24 V24"/>
+      <path d="M-46,-4 h92"/>
+    </g>
+  </g>
+  <ellipse cx="60" cy="150" rx="20" ry="34" fill="none" stroke="#000000" stroke-width="26"/>
+    <ellipse cx="60" cy="150" rx="20" ry="34" fill="none" stroke="#FFD700" stroke-width="14"/>
+    <ellipse cx="60" cy="202" rx="34" ry="22" fill="none" stroke="#000000" stroke-width="26"/>
+    <ellipse cx="60" cy="202" rx="34" ry="22" fill="none" stroke="#FFD700" stroke-width="14"/>
+    <ellipse cx="60" cy="254" rx="20" ry="34" fill="none" stroke="#000000" stroke-width="26"/>
+    <ellipse cx="60" cy="254" rx="20" ry="34" fill="none" stroke="#FFD700" stroke-width="14"/>
+    <ellipse cx="60" cy="306" rx="34" ry="22" fill="none" stroke="#000000" stroke-width="26"/>
+    <ellipse cx="60" cy="306" rx="34" ry="22" fill="none" stroke="#FFD700" stroke-width="14"/>
+    <ellipse cx="60" cy="358" rx="20" ry="34" fill="none" stroke="#000000" stroke-width="26"/>
+    <ellipse cx="60" cy="358" rx="20" ry="34" fill="none" stroke="#FFD700" stroke-width="14"/>
+    <ellipse cx="60" cy="410" rx="34" ry="22" fill="none" stroke="#000000" stroke-width="26"/>
+    <ellipse cx="60" cy="410" rx="34" ry="22" fill="none" stroke="#FFD700" stroke-width="14"/>
+    <ellipse cx="60" cy="462" rx="20" ry="34" fill="none" stroke="#000000" stroke-width="26"/>
+    <ellipse cx="60" cy="462" rx="20" ry="34" fill="none" stroke="#FFD700" stroke-width="14"/>
+    <ellipse cx="60" cy="514" rx="34" ry="22" fill="none" stroke="#000000" stroke-width="26"/>
+    <ellipse cx="60" cy="514" rx="34" ry="22" fill="none" stroke="#FFD700" stroke-width="14"/>
+    <ellipse cx="60" cy="566" rx="20" ry="34" fill="none" stroke="#000000" stroke-width="26"/>
+    <ellipse cx="60" cy="566" rx="20" ry="34" fill="none" stroke="#FFD700" stroke-width="14"/>
+  <rect x="92" y="135" width="15" height="1.3" fill="#000000" opacity="0.22" transform="rotate(19 92 135)"/>
+  <rect x="27" y="526" width="14" height="2.7" fill="#000000" opacity="0.22" transform="rotate(20 27 526)"/>
+  <rect x="42" y="282" width="15" height="1.6" fill="#000000" opacity="0.22" transform="rotate(-9 42 282)"/>
+  <rect x="42" y="516" width="17" height="2.6" fill="#000000" opacity="0.22" transform="rotate(-11 42 516)"/>
+  <rect x="89" y="360" width="9" height="1.9" fill="#000000" opacity="0.22" transform="rotate(-3 89 360)"/>
+  <rect x="31" y="384" width="10" height="2.1" fill="#000000" opacity="0.22" transform="rotate(17 31 384)"/>
+  <rect x="70" y="312" width="17" height="3.0" fill="#000000" opacity="0.22" transform="rotate(-0 70 312)"/>
+  <rect x="90" y="138" width="8" height="1.3" fill="#000000" opacity="0.22" transform="rotate(18 90 138)"/>
+  <rect x="73" y="454" width="10" height="2.0" fill="#000000" opacity="0.22" transform="rotate(15 73 454)"/>
+  <rect x="33" y="182" width="7" height="1.9" fill="#000000" opacity="0.22" transform="rotate(14 33 182)"/>
+  <rect x="64" y="311" width="12" height="1.4" fill="#000000" opacity="0.22" transform="rotate(18 64 311)"/>
+  <rect x="50" y="236" width="10" height="2.6" fill="#000000" opacity="0.22" transform="rotate(-7 50 236)"/>
+  <rect x="88" y="281" width="11" height="1.1" fill="#000000" opacity="0.22" transform="rotate(16 88 281)"/>
+  <rect x="80" y="344" width="7" height="2.0" fill="#000000" opacity="0.22" transform="rotate(-5 80 344)"/>
+  <rect x="83" y="548" width="15" height="1.6" fill="#000000" opacity="0.22" transform="rotate(-18 83 548)"/>
+  <rect x="87" y="555" width="8" height="2.0" fill="#000000" opacity="0.22" transform="rotate(-1 87 555)"/>
+  <rect x="92" y="149" width="7" height="2.7" fill="#000000" opacity="0.22" transform="rotate(3 92 149)"/>
+  <rect x="57" y="480" width="13" height="2.4" fill="#000000" opacity="0.22" transform="rotate(-10 57 480)"/>
+  <rect x="32" y="134" width="10" height="2.3" fill="#000000" opacity="0.22" transform="rotate(-5 32 134)"/>
+  <rect x="50" y="408" width="15" height="2.2" fill="#000000" opacity="0.22" transform="rotate(-8 50 408)"/>
+</svg>

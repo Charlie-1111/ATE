@@ -29,15 +29,21 @@ const initialState = {
   myRoundWins: 0,
   opponentRoundWins: 0,
   isMyTurn: false,
+  turnLive: false,
+  countdownSec: 0,
   showCoinDraw: false,
   firstTurnUserId: null,
   coinDrawMs: 2500,
   opponentTyping: false,
   lastRoastResult: null,
+  lastRoastError: null,
+  roastAcceptedAt: null,
   roundScores: [],
   messages: [],
   winner: null,
   opponent: null,
+  queueError: null,
+  queuePosition: null,
 }
 
 export const useBattleStore = create((set, get) => ({
@@ -53,6 +59,8 @@ export const useBattleStore = create((set, get) => ({
     topic: data.topic ?? null,
     currentRound: data.currentRound || 1,
     isMyTurn: data.isMyTurn || false,
+    queueError: data.queueError ?? null,
+    queuePosition: data.queuePosition ?? null,
   }),
 
   startBattle: (data) => set({
@@ -65,6 +73,8 @@ export const useBattleStore = create((set, get) => ({
     topic: data.topic ?? null,
     currentRound: 1,
     isMyTurn: false,
+    turnLive: false,
+    countdownSec: 0,
     showCoinDraw: true,
     firstTurnUserId: data.firstTurnUserId ?? null,
     coinDrawMs: data.coinDrawMs || 2500,
@@ -115,7 +125,8 @@ export const useBattleStore = create((set, get) => ({
 
     set({
       lastRoastResult: { ...result, marks, quality: marks, score: marks },
-      isMyTurn: false,
+      // Only end our turn when WE scored — late opponent roast_scored must not steal your_turn
+      isMyTurn: isMine ? false : state.isMyTurn,
       myScore: isMine ? marks : state.myScore,
       opponentScore: !isMine ? marks : state.opponentScore,
       myTotalScore: isMine ? nextTotal : state.myTotalScore,
@@ -132,6 +143,8 @@ export const useBattleStore = create((set, get) => ({
     lastRoastResult: null,
     roundScores: [...get().roundScores, data.roundResult],
     isMyTurn: data.isMyTurn,
+    turnLive: false,
+    countdownSec: data.isMyTurn ? 3 : 0,
     firstTurnUserId: data.firstTurnUserId ?? null,
   }),
 
@@ -146,7 +159,27 @@ export const useBattleStore = create((set, get) => ({
     showCoinDraw: false,
   }),
 
-  setTurn: (isMyTurn) => set({ isMyTurn }),
+  setTurn: (isMyTurn) => set({
+    isMyTurn,
+    turnLive: false,
+    countdownSec: isMyTurn ? 3 : 0,
+  }),
+
+  setCountdown: (seconds) => set({
+    countdownSec: Math.max(0, Number(seconds) || 0),
+    turnLive: false,
+    isMyTurn: true,
+  }),
+
+  setTurnLive: () => set({
+    turnLive: true,
+    countdownSec: 0,
+    isMyTurn: true,
+  }),
+
+  noteRoastError: () => set({ lastRoastError: Date.now() }),
+
+  noteRoastAccepted: () => set({ roastAcceptedAt: Date.now() }),
 
   reset: () => set(initialState),
 }))

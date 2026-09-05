@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Turn timer">
+  <circle cx="24" cy="27" r="17" fill="#FFD700" stroke="#000000" stroke-width="4"/>
+  <path d="M24 27V15M24 27l9 6" stroke="#000000" stroke-width="4" stroke-linecap="square"/>
+  <path d="M17 4h14M24 4v6" stroke="#000000" stroke-width="4" stroke-linecap="square"/>
+  <path d="M38 10l5 5" stroke="#000000" stroke-width="4" stroke-linecap="square"/>
+</svg>

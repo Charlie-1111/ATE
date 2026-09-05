@@ -1,18 +1,18 @@
-/** Rap character pack catalog — unlock tiers + premium mock buy */
+/** Rap roster catalog — street / drip / icon unlock tiers */
 
-export const DEFAULT_CHARACTER_ID = 'echo'
+export const DEFAULT_CHARACTER_ID = 'static'
 
 export const CHARACTERS = [
-  { id: 'echo', name: 'Echo', rarity: 'free', winsRequired: 0, price: null },
-  { id: 'riff', name: 'Riff', rarity: 'progress', winsRequired: 1, price: null },
-  { id: 'koko', name: 'Koko', rarity: 'progress', winsRequired: 3, price: null },
-  { id: 'torque', name: 'Torque', rarity: 'progress', winsRequired: 5, price: null },
-  { id: 'velvet', name: 'Velvet', rarity: 'progress', winsRequired: 8, price: null },
-  { id: 'brickz', name: 'Brickz', rarity: 'progress', winsRequired: 12, price: null },
-  { id: 'nyx', name: 'Nyx', rarity: 'progress', winsRequired: 18, price: null },
-  { id: 'riot', name: 'Riot', rarity: 'progress', winsRequired: 25, price: null },
-  { id: 'vanta', name: 'Vanta', rarity: 'premium', winsRequired: null, price: '$4.99' },
-  { id: 'solara', name: 'Solara', rarity: 'premium', winsRequired: null, price: '$4.99' },
+  { id: 'static', name: 'Static', rarity: 'free', winsRequired: 0, price: null },
+  { id: 'lil_grid', name: 'Lil Grid', rarity: 'progress', winsRequired: 1, price: null },
+  { id: 'young_vector', name: 'Young Vector', rarity: 'progress', winsRequired: 3, price: null },
+  { id: 'poly_flow', name: 'Poly Flow', rarity: 'progress', winsRequired: 5, price: null },
+  { id: 'static_drip', name: 'Static Drip', rarity: 'progress', winsRequired: 8, price: null },
+  { id: 'grid_drip', name: 'Lil Grid Drip', rarity: 'progress', winsRequired: 12, price: null },
+  { id: 'vector_drip', name: 'Young Vector Drip', rarity: 'progress', winsRequired: 18, price: null },
+  { id: 'poly_drip', name: 'Poly Flow Drip', rarity: 'progress', winsRequired: 25, price: null },
+  { id: 'king_octane', name: 'King Octane', rarity: 'premium', winsRequired: null, price: '$4.99' },
+  { id: 'nova_scott', name: 'Nova Scott', rarity: 'premium', winsRequired: null, price: '$4.99' },
 ]
 
 const BY_ID = Object.fromEntries(CHARACTERS.map((c) => [c.id, c]))
@@ -26,7 +26,24 @@ export function characterModelUrl(id) {
   return `/characters/${c.id}.glb`
 }
 
-/** Progress unlocks from ranked wins + always Echo; premium must be bought separately. */
+/** Map battle animation intents → clips shipped in the roster GLBs. */
+export function resolveClipName(want, available = {}) {
+  const w = (want || 'idle').toLowerCase()
+  const aliases = {
+    idle: ['idle'],
+    roast: ['rap_verse', 'roast', 'idle'],
+    hit: ['dance', 'hit', 'idle'],
+    victory: ['dance', 'victory', 'idle'],
+    dance: ['dance', 'idle'],
+    rap_verse: ['rap_verse', 'idle'],
+  }
+  for (const name of aliases[w] || [w, 'idle']) {
+    if (available[name]) return name
+  }
+  return Object.keys(available)[0] || null
+}
+
+/** Progress unlocks from ranked wins + always Static; premium must be bought separately. */
 export function unlockedFromWins(wins = 0) {
   const n = Math.max(0, Number(wins) || 0)
   return CHARACTERS

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900"
+     preserveAspectRatio="xMidYMid slice" role="img" aria-label="Battle stage backdrop">
+  <defs>
+    <radialGradient id="beamL" cx="26%" cy="8%" r="55%" fx="26%" fy="0%">
+      <stop offset="0%" stop-color="#FFD700" stop-opacity="0.38"/>
+      <stop offset="35%" stop-color="#FFD700" stop-opacity="0.14"/>
+      <stop offset="70%" stop-color="#FFD700" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#FFD700" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="beamR" cx="74%" cy="8%" r="55%" fx="74%" fy="0%">
+      <stop offset="0%" stop-color="#FFD700" stop-opacity="0.38"/>
+      <stop offset="35%" stop-color="#FFD700" stop-opacity="0.14"/>
+      <stop offset="70%" stop-color="#FFD700" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#FFD700" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="haze" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFD700" stop-opacity="0.08"/>
+      <stop offset="0.45" stop-color="#FFD700" stop-opacity="0.02"/>
+      <stop offset="1" stop-color="#FFD700" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="readzone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.10"/>
+      <stop offset="0.30" stop-color="#000000" stop-opacity="0.82"/>
+      <stop offset="0.78" stop-color="#000000" stop-opacity="0.82"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.20"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="#000000"/>
+  <g fill="#141414">
+    <rect x="0" y="0" width="1600" height="620"/>
+  </g>
+  <g stroke="#1F1F1F" stroke-width="4">
+    <path d="M200,0 V620 M480,0 V620 M760,0 V620 M1040,0 V620 M1320,0 V620"/>
+  </g>
+
+  <!-- soft spotlight washes (no hard polygon edges) -->
+  <ellipse cx="420" cy="120" rx="280" ry="520" fill="url(#beamL)"/>
+  <ellipse cx="1180" cy="120" rx="280" ry="520" fill="url(#beamR)"/>
+  <rect x="0" y="0" width="1600" height="620" fill="url(#haze)"/>
+
+  <!-- rigging -->
+  <rect x="0" y="52" width="1600" height="18" fill="#000000"/>
+  <g fill="#0B0B0B" stroke="#000000" stroke-width="8">
+    <rect x="330" y="70" width="90" height="60"/>
+    <rect x="1180" y="70" width="90" height="60"/>
+  </g>
+  <g fill="#FFD700" opacity="0.85">
+    <rect x="342" y="126" width="66" height="10"/>
+    <rect x="1192" y="126" width="66" height="10"/>
+  </g>
+
+  <!-- speaker stacks -->
+  <g stroke="#000000" stroke-width="10" fill="#101010">
+    <rect x="60" y="300" width="230" height="320"/>
+    <rect x="1310" y="300" width="230" height="320"/>
+  </g>
+  <g fill="#0A0A0A" stroke="#5A5A5A" stroke-width="6">
+    <circle cx="175" cy="385" r="52"/><circle cx="175" cy="520" r="66"/>
+    <circle cx="1425" cy="385" r="52"/><circle cx="1425" cy="520" r="66"/>
+  </g>
+  <g fill="#FFD700" opacity="0.5">
+    <circle cx="175" cy="385" r="12"/><circle cx="175" cy="520" r="14"/>
+    <circle cx="1425" cy="385" r="12"/><circle cx="1425" cy="520" r="14"/>
+  </g>
+
+  <!-- stage lip -->
+  <rect x="0" y="600" width="1600" height="26" fill="#C1121F"/>
+  <rect x="0" y="626" width="1600" height="20" fill="#000000"/>
+
+  <!-- centre mic stand -->
+  <g stroke="#000000" stroke-width="12" fill="#0B0B0B">
+    <rect x="792" y="330" width="16" height="270"/>
+    <rect x="742" y="592" width="116" height="16"/>
+  </g>
+  <g transform="translate(800,300)">
+    <ellipse cx="0" cy="0" rx="34" ry="44" fill="#FFD700" stroke="#000000" stroke-width="10"/>
+    <path d="M-34,6 H34" stroke="#000000" stroke-width="8"/>
+    <path d="M-30,-16 H30 M-32,-2 H32 M-28,18 H28" stroke="#000000" stroke-width="6" opacity="0.7"/>
+  </g>
+
+  <!-- crowd silhouette + raised hands -->
+  <g fill="#000000">
+    <path d="M0,900 V700 c60,-40 120,10 180,-18 60,-28 110,26 170,4 60,-22 120,22 180,0 60,-22 120,20 180,2
+             60,-18 120,20 180,0 60,-20 120,18 180,-2 60,-20 120,16 180,-4 60,-20 100,14 150,-6 V900 Z"/>
+    <g stroke="#000000" stroke-width="26" stroke-linecap="round">
+      <path d="M240,760 V700"/><path d="M410,772 V706"/><path d="M600,758 V690"/>
+      <path d="M980,764 V700"/><path d="M1180,756 V694"/><path d="M1400,770 V708"/>
+    </g>
+  </g>
+
+  <rect x="0" y="150" width="1600" height="420" fill="url(#readzone)"/>
+</svg>

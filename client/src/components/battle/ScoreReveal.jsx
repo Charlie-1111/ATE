@@ -1,20 +1,18 @@
 import { motion } from 'framer-motion'
 import { formatScore, formatTotal, getScoreTier } from '../../lib/scoring.js'
+import { badgeForFeedback, UI } from '../../lib/uiAssets.js'
 
 export default function ScoreReveal({ result, isVisible }) {
   if (!result || !isVisible) return null
 
   const marks = Number(result.marks ?? result.quality ?? result.score) || 0
   const tier = getScoreTier(marks)
-  const tierClass = result.isTimeout || result.blocked
-    ? 'text-danger'
-    : marks >= 9
-      ? 'text-accent-gold'
-      : marks >= 7
-        ? 'text-accent-cyan'
-        : marks >= 5
-          ? 'text-white'
-          : 'text-danger'
+  const feedback = result.feedback || tier.label
+  const stamp = result.isTimeout
+    ? UI.stampTimeout
+    : result.blocked
+      ? UI.stampBlocked
+      : badgeForFeedback(feedback, marks)
 
   return (
     <motion.div
@@ -22,42 +20,31 @@ export default function ScoreReveal({ result, isVisible }) {
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.5, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-      className="flex flex-col items-center gap-3 py-6"
+      className="flex flex-col items-center gap-4 py-6 px-4"
     >
-      <motion.div
-        className="text-7xl font-display font-black"
-        initial={{ y: -20 }}
-        animate={{ y: 0 }}
-        transition={{ delay: 0.2, type: 'spring' }}
-      >
-        <span className={tierClass}>{formatScore(marks)}/10</span>
-      </motion.div>
+      <motion.img
+        src={stamp}
+        alt={feedback}
+        className="w-48 h-auto drop-shadow-[4px_4px_0_#000]"
+        initial={{ rotate: -12, scale: 0.6 }}
+        animate={{ rotate: -4, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 260 }}
+      />
 
-      <p className="text-sm text-text-muted font-mono">
-        total {formatTotal(result.newTotal ?? marks)}
+      <p className="font-display text-4xl text-[var(--ate-gold)] uppercase tracking-wider">
+        {formatScore(marks)}/10
       </p>
 
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ delay: 0.4, type: 'spring', stiffness: 400 }}
-        className="text-xl font-display font-bold uppercase tracking-wider"
-      >
-        {result.isTimeout ? (
-          <span className="text-danger">TIMEOUT</span>
-        ) : result.blocked ? (
-          <span className="text-danger">BLOCKED</span>
-        ) : (
-          <span className={tierClass}>{result.feedback || tier.label}</span>
-        )}
-      </motion.div>
+      <p className="text-sm text-[var(--ate-grey)] font-mono">
+        total {formatTotal(result.newTotal ?? marks)}
+      </p>
 
       {result.text && !result.isTimeout && (
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="text-text text-center max-w-md italic"
+          transition={{ delay: 0.35 }}
+          className="text-[var(--ate-bone)] text-center max-w-md italic"
         >
           "{result.text}"
         </motion.p>

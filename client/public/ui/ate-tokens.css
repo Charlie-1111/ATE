@@ -1,0 +1,58 @@
+/* ATE — design tokens. Import once, e.g. in client/src/index.css */
+:root {
+  --ate-black:      #000000;
+  --ate-ink:        #0B0B0B;
+  --ate-gold:       #FFD700;
+  --ate-gold-deep:  #B8860B;
+  --ate-red:        #C1121F;
+  --ate-red-deep:   #7A0A12;
+  --ate-bone:       #EDE3CF;
+  --ate-grey:       #5A5A5A;
+  --ate-silver:     #C9C9C9;
+  --ate-bronze:     #A9682C;
+
+  --ate-outline:    4px solid var(--ate-black);
+  --ate-stamp-tilt: -8deg;
+}
+
+body {
+  background-color: var(--ate-black);
+  color: var(--ate-bone);
+}
+
+/* subtle grain over any dark surface */
+.ate-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("/ui/texture-noise.svg");
+  background-repeat: repeat;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.ate-panel {
+  background-color: var(--ate-ink);
+  border-image: url("/ui/panel-frame-9slice.svg") 60 fill stretch;
+  border-width: 20px;
+  border-style: solid;
+}
+
+.ate-btn {
+  background: url("/ui/btn-gold.svg") no-repeat center / 100% 100%;
+  border: 0;
+  color: var(--ate-black);
+  font-family: "Anton", Impact, "Arial Black", sans-serif;
+  letter-spacing: 0.06em;
+  padding: 18px 44px 26px;
+}
+.ate-btn:active {
+  background-image: url("/ui/btn-gold-pressed.svg");
+  transform: translateY(4px);
+}
+.ate-btn--dark { background-image: url("/ui/btn-dark.svg"); color: var(--ate-gold); }
+.ate-btn--dark:active { background-image: url("/ui/btn-dark-pressed.svg"); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ate-btn { transition: none; }
+}

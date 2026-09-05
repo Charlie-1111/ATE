@@ -10,6 +10,7 @@ const BOT_USER_ID = '__BOT__'
 const START_SCORE = 0
 const TURN_TIME_MS = 20000
 const COIN_DRAW_MS = 2500
+const TURN_COUNTDOWN_SECS = Number(process.env.ATE_TURN_COUNTDOWN_SECS) || 3
 
 const BOT_NAMES = [
   'Chef LoudMouth', 'RoastBot 3000', 'Savage.exe', 'Toasty McBurns',
@@ -113,12 +114,11 @@ function beginFirstTurn(io, battle) {
     return
   }
 
-  io.to(first.socketId).emit('your_turn')
   const other = battle.players.find((p) => p.userId !== firstId)
   if (other && other.socketId !== 'bot') {
     io.to(other.socketId).emit('opponents_turn')
   }
-  startTurnTimer(io, battle, first.socketId, first.userId)
+  openHumanTurn(io, battle, first.socketId, first.userId)
 }
 
 function scheduleFirstTurn(io, battle) {
@@ -134,14 +134,10 @@ function setupSocketHandlers(io) {
       const isPlayerFirst = Math.random() < 0.5
       const botName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)]
       const battleMode = mode === 'topic' ? 'topic' : 'freestyle'
-      const charId = characterId || avatarId || 'echo'
+      const charId = characterId || avatarId || 'static'
       let topic = null
       if (battleMode === 'topic') {
-        try {
-          topic = await generateTopic()
-        } catch {
-          topic = 'bad fashion sense'
-        }
+        topic = await generateTopic()
       }
 
       const botPlayer = {
@@ -150,7 +146,7 @@ function setupSocketHandlers(io) {
         format,
         mode: battleMode,
         displayName: botName,
-        characterId: 'riot',
+        characterId: 'lil_grid',
         joinedAt: Date.now(),
       }
       const humanPlayer = {
@@ -182,6 +178,9 @@ function setupSocketHandlers(io) {
         createdAt: Date.now(),
         isPractice: true,
         roastSubmitted: false,
+        turnId: 0,
+        countdownActive: false,
+        turnLive: false,
       }
 
       activeBattles.set(battleId, battle)
@@ -193,11 +192,14 @@ function setupSocketHandlers(io) {
     })
 
     socket.on('join_queue', ({ userId, format, mode, displayName, characterId, avatarId }) => {
+      if (!userId) {
+        socket.emit('queue_error', { error: 'missing_user' })
+        return
+      }
       const battleMode = mode === 'topic' ? 'topic' : 'freestyle'
       const fmt = format || 'best_of_3'
-      const charId = characterId || avatarId || 'echo'
-      console.log(`[Queue] ${userId} joined (${fmt}, ${battleMode})`)
-      // Replace existing queue entry for this user
+      const charId = characterId || avatarId || 'static'
+      console.log(`[Queue] ${userId} joined (${fmt}, ${battleMode}) size=${matchmakingQueue.length + 1}`)
       const existing = matchmakingQueue.findIndex((p) => p.userId === userId)
       if (existing !== -1) matchmakingQueue.splice(existing, 1)
 
@@ -234,17 +236,40 @@ function setupSocketHandlers(io) {
       if (opponent && opponent.socketId !== 'bot') io.to(opponent.socketId).emit('opponent_stopped_typing')
     })
 
-    socket.on('roast_sent', async ({ battleId, text, isTimeout }) => {
+    socket.on('roast_sent', async ({ battleId, text, isTimeout, userId }) => {
       const battle = activeBattles.get(battleId)
-      if (!battle) return
+      if (!battle) {
+        socket.emit('roast_error', { error: 'no_battle', battleId })
+        return
+      }
 
-      const player = battle.players.find((p) => p.socketId === socket.id)
-      if (!player) return
-      if (battle.currentTurn !== player.userId) return
-      if (battle.roastSubmitted) return
+      const player = resolvePlayer(battle, socket, userId)
+      if (!player) {
+        socket.emit('roast_error', { error: 'not_in_battle', battleId })
+        return
+      }
+      if (battle.currentTurn !== player.userId) {
+        socket.emit('roast_error', { error: 'not_your_turn', battleId, currentTurn: battle.currentTurn })
+        return
+      }
+      if (battle.roastSubmitted) {
+        socket.emit('roast_error', { error: 'already_submitted', battleId })
+        return
+      }
+      if (battle.countdownActive) {
+        socket.emit('roast_error', { error: 'countdown', battleId })
+        return
+      }
+      if (!battle.turnLive) {
+        socket.emit('roast_error', { error: 'turn_not_live', battleId })
+        return
+      }
 
+      const turnId = battle.turnId
       clearTurnTimer(battleId)
       battle.roastSubmitted = true
+      // Ack immediately so the client knows the roast counted (before slow Ollama)
+      socket.emit('roast_accepted', { battleId, turnId, isTimeout: !!isTimeout })
 
       let payload
 
@@ -258,14 +283,12 @@ function setupSocketHandlers(io) {
         })
         socket.emit('roast_scored', payload)
       } else {
-        let result
-        try {
-          result = await scoreRoast(text, scoreCtx(battle, player.userId))
-        } catch (err) {
-          console.error('[Ollama] Scoring failed:', err.message)
-          result = { marks: 5, quality: 5, feedback: 'MID', blocked: false }
+        const result = await scoreRoastBounded(text, scoreCtx(battle, player.userId))
+        // Stale turn / battle ended while scoring — don't apply
+        if (!activeBattles.has(battle.id) || battle.turnId !== turnId) {
+          socket.emit('roast_error', { error: 'stale_turn', battleId })
+          return
         }
-
         payload = recordRoast(battle, player.userId, {
           marks: result.marks ?? result.quality,
           quality: result.marks ?? result.quality,
@@ -285,16 +308,16 @@ function setupSocketHandlers(io) {
         finishRound(io, battle, currentRound)
       } else if (opponent?.socketId === 'bot') {
         battle.currentTurn = BOT_USER_ID
+        battle.roastSubmitted = false
+        battle.turnLive = false
+        battle.countdownActive = false
         botTurn(io, battle, socket)
       } else if (opponent) {
         io.to(opponent.socketId).emit('roast_scored', payload)
-        battle.currentTurn = opponent.userId
-        battle.roastSubmitted = false
         setTimeout(() => {
           if (!activeBattles.has(battle.id) || battle.status !== 'active') return
-          io.to(opponent.socketId).emit('your_turn')
           socket.emit('opponents_turn')
-          startTurnTimer(io, battle, opponent.socketId, opponent.userId)
+          openHumanTurn(io, battle, opponent.socketId, opponent.userId)
         }, 3000)
       }
     })
@@ -323,14 +346,23 @@ function setupSocketHandlers(io) {
   })
 }
 
-function startTurnTimer(io, battle, socketId, userId) {
+function startTurnTimer(io, battle, socketId, userId, opts = {}) {
   clearTurnTimer(battle.id)
+  if (!opts.skipTurnBump) {
+    battle.turnId = (battle.turnId || 0) + 1
+  }
+  const turnId = battle.turnId
+  battle.roastSubmitted = false
+  battle.currentTurn = userId
+  battle.countdownActive = false
+  battle.turnLive = true
 
   const timer = setTimeout(() => {
     if (!activeBattles.has(battle.id) || battle.status !== 'active') return
+    if (battle.turnId !== turnId) return
     if (battle.roastSubmitted || battle.currentTurn !== userId) return
 
-    console.log(`[Timer] ${userId} timed out in battle ${battle.id}`)
+    console.log(`[Timer] ${userId} timed out in battle ${battle.id} turn=${turnId}`)
     battle.roastSubmitted = true
 
     const payload = recordRoast(battle, userId, {
@@ -356,20 +388,52 @@ function startTurnTimer(io, battle, socketId, userId) {
       finishRound(io, battle, round)
     } else if (opponent?.socketId === 'bot') {
       battle.currentTurn = BOT_USER_ID
+      battle.roastSubmitted = false
+      battle.turnLive = false
       botTurn(io, battle, { id: socketId })
     } else if (opponent) {
-      battle.currentTurn = opponent.userId
-      battle.roastSubmitted = false
+      battle.turnLive = false
       setTimeout(() => {
         if (!activeBattles.has(battle.id) || battle.status !== 'active') return
-        io.to(opponent.socketId).emit('your_turn')
         io.to(socketId).emit('opponents_turn')
-        startTurnTimer(io, battle, opponent.socketId, opponent.userId)
+        openHumanTurn(io, battle, opponent.socketId, opponent.userId)
       }, 1000)
     }
   }, TURN_TIME_MS)
 
-  turnTimers.set(`${battle.id}:${userId}`, timer)
+  turnTimers.set(`${battle.id}:${turnId}`, timer)
+}
+
+/**
+ * Open a human turn with 3-2-1 countdown before the 20s clock starts.
+ */
+async function openHumanTurn(io, battle, socketId, userId) {
+  if (!activeBattles.has(battle.id) || battle.status !== 'active') return
+
+  clearTurnTimer(battle.id)
+  battle.turnId = (battle.turnId || 0) + 1
+  const turnId = battle.turnId
+  battle.currentTurn = userId
+  battle.roastSubmitted = false
+  battle.countdownActive = true
+  battle.turnLive = false
+
+  io.to(socketId).emit('your_turn', { countdownSec: TURN_COUNTDOWN_SECS, turnId })
+
+  for (let s = TURN_COUNTDOWN_SECS; s >= 1; s--) {
+    if (!activeBattles.has(battle.id) || battle.status !== 'active') return
+    if (battle.turnId !== turnId) return
+    io.to(socketId).emit('turn_countdown', { seconds: s, turnId })
+    await sleep(1000)
+  }
+
+  if (!activeBattles.has(battle.id) || battle.status !== 'active') return
+  if (battle.turnId !== turnId) return
+
+  battle.countdownActive = false
+  battle.turnLive = true
+  io.to(socketId).emit('turn_live', { turnId })
+  startTurnTimer(io, battle, socketId, userId, { skipTurnBump: true })
 }
 
 function clearTurnTimer(battleId) {
@@ -381,69 +445,135 @@ function clearTurnTimer(battleId) {
   }
 }
 
+function resolvePlayer(battle, socket, userId) {
+  let player = battle.players.find((p) => p.socketId === socket.id)
+  if (player) return player
+  if (!userId) return null
+  player = battle.players.find((p) => p.userId === userId && p.socketId !== 'bot')
+  if (!player) return null
+  // Rebind after reconnect so later emits / timers hit this socket
+  const prev = player.socketId
+  if (prev && prev !== socket.id) playerBattles.delete(prev)
+  player.socketId = socket.id
+  playerBattles.set(socket.id, battle.id)
+  console.log(`[Socket] rebound ${userId} ${prev} → ${socket.id}`)
+  return player
+}
+
+async function scoreRoastBounded(text, ctx) {
+  const SCORE_MS = Number(process.env.ATE_SCORE_TIMEOUT_MS) || 12000
+  try {
+    return await Promise.race([
+      scoreRoast(text, ctx),
+      new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({ marks: 5, quality: 5, feedback: 'MID', blocked: false, source: 'score_timeout' })
+        }, SCORE_MS)
+      }),
+    ])
+  } catch (err) {
+    console.error('[Ollama] Scoring failed:', err.message)
+    return { marks: 5, quality: 5, feedback: 'MID', blocked: false, source: 'score_error' }
+  }
+}
+
 async function botTurn(io, battle, humanSocket) {
   if (!activeBattles.has(battle.id) || battle.status !== 'active') return
 
-  const typingDelay = 1500 + Math.random() * 3000
-  const thinkingDelay = 1000 + Math.random() * 2000
-  const roundAtStart = battle.currentRound
-
-  io.to(humanSocket.id).emit('opponent_typing')
-
-  await sleep(typingDelay)
-  if (!activeBattles.has(battle.id) || battle.status !== 'active') return
-  if (battle.currentRound !== roundAtStart) return
-
-  io.to(humanSocket.id).emit('opponent_stopped_typing')
-
-  let roastText
-  try {
-    roastText = await generateRoast(battle.topic || null)
-  } catch {
-    roastText = fallbackRoast()
-  }
-
-  await sleep(thinkingDelay)
-  if (!activeBattles.has(battle.id) || battle.status !== 'active') return
-  if (battle.currentRound !== roundAtStart) return
-
-  const round = battle.currentRound
-  let result
-  try {
-    result = await scoreRoast(roastText, scoreCtx(battle, BOT_USER_ID))
-  } catch {
-    result = { marks: 5.5, quality: 5.5, feedback: 'MID', blocked: false }
-  }
-
-  const payload = recordRoast(battle, BOT_USER_ID, {
-    marks: result.marks ?? result.quality,
-    quality: result.marks ?? result.quality,
-    feedback: result.feedback,
-    text: roastText,
-    blocked: result.blocked,
-  })
-
-  io.to(humanSocket.id).emit('roast_scored', payload)
-
-  const roundData = battle.roundScores[round]
-  const roundComplete = roundData?.player1 != null && roundData?.player2 != null
-
-  if (roundComplete) {
-    finishRound(io, battle, round)
+  const sid = humanSocket?.id || humanSocket?.socketId
+  if (!sid) {
+    console.warn('[botTurn] missing human socket id')
     return
   }
 
-  const humanPlayer = battle.players.find((p) => p.socketId !== 'bot')
-  battle.currentTurn = humanPlayer.userId
-  battle.roastSubmitted = false
+  const typingDelay = Number(process.env.ATE_BOT_TYPING_MS) || (1500 + Math.random() * 3000)
+  const thinkingDelay = Number(process.env.ATE_BOT_THINK_MS) || (1000 + Math.random() * 2000)
+  const handoffDelay = Number(process.env.ATE_BOT_HANDOFF_MS) || 3000
+  const roundAtStart = battle.currentRound
+  let typingStarted = false
+  let handedOff = false
+  let handoffStarted = false
 
-  await sleep(3000)
-  if (!activeBattles.has(battle.id) || battle.status !== 'active') return
-  if (battle.currentRound !== round) return
-  if (battle.currentTurn !== humanPlayer.userId) return
+  const handToHuman = async () => {
+    if (handoffStarted) return
+    handoffStarted = true
+    await sleep(handoffDelay)
+    if (!activeBattles.has(battle.id) || battle.status !== 'active') return
+    if (battle.currentRound !== roundAtStart) return
+    const humanPlayer = battle.players.find((p) => p.socketId !== 'bot')
+    if (!humanPlayer) return
+    await openHumanTurn(io, battle, sid, humanPlayer.userId)
+    handedOff = true
+  }
 
-  io.to(humanSocket.id).emit('your_turn')
-  startTurnTimer(io, battle, humanSocket.id, humanPlayer.userId)
+  try {
+    battle.currentTurn = BOT_USER_ID
+    battle.roastSubmitted = false
+
+    io.to(sid).emit('opponent_typing')
+    typingStarted = true
+
+    await sleep(typingDelay)
+    if (!activeBattles.has(battle.id) || battle.status !== 'active') return
+    if (battle.currentRound !== roundAtStart) return
+
+    io.to(sid).emit('opponent_stopped_typing')
+    typingStarted = false
+
+    let roastText
+    try {
+      roastText = await generateRoast(battle.topic || null)
+    } catch {
+      roastText = fallbackRoast()
+    }
+
+    await sleep(thinkingDelay)
+    if (!activeBattles.has(battle.id) || battle.status !== 'active') return
+    if (battle.currentRound !== roundAtStart) return
+
+    const round = battle.currentRound
+    const result = await scoreRoastBounded(roastText, scoreCtx(battle, BOT_USER_ID))
+
+    const payload = recordRoast(battle, BOT_USER_ID, {
+      marks: result.marks ?? result.quality,
+      quality: result.marks ?? result.quality,
+      feedback: result.feedback,
+      text: roastText,
+      blocked: result.blocked,
+    })
+
+    io.to(sid).emit('roast_scored', payload)
+
+    const roundData = battle.roundScores[round]
+    const roundComplete = roundData?.player1 != null && roundData?.player2 != null
+
+    if (roundComplete) {
+      finishRound(io, battle, round)
+      handedOff = true
+      return
+    }
+
+    await handToHuman()
+  } catch (err) {
+    console.error('[botTurn] failed:', err.message)
+  } finally {
+    if (typingStarted && activeBattles.has(battle.id)) {
+      io.to(sid).emit('opponent_stopped_typing')
+    }
+    if (
+      !handedOff &&
+      !handoffStarted &&
+      activeBattles.has(battle.id) &&
+      battle.status === 'active' &&
+      battle.currentRound === roundAtStart &&
+      battle.currentTurn === BOT_USER_ID
+    ) {
+      const humanPlayer = battle.players.find((p) => p.socketId !== 'bot')
+      if (humanPlayer) {
+        await openHumanTurn(io, battle, sid, humanPlayer.userId)
+      }
+    }
+  }
 }
 
 const FALLBACK_ROASTS = [
@@ -489,16 +619,54 @@ async function matchPlayers(io, p1, p2) {
   const i2 = matchmakingQueue.indexOf(p2)
   if (i2 !== -1) matchmakingQueue.splice(i2, 1)
 
+  const s1 = io.sockets.sockets.get(p1.socketId)
+  const s2 = io.sockets.sockets.get(p2.socketId)
+  if (!s1?.connected || !s2?.connected) {
+    console.warn('[Match] abort — socket disconnected during pair')
+    if (s1?.connected) {
+      matchmakingQueue.push(p1)
+      io.to(p1.socketId).emit('queued', {
+        position: matchmakingQueue.length,
+        mode: p1.mode,
+        format: p1.format,
+      })
+    }
+    if (s2?.connected) {
+      matchmakingQueue.push(p2)
+      io.to(p2.socketId).emit('queued', {
+        position: matchmakingQueue.length,
+        mode: p2.mode,
+        format: p2.format,
+      })
+    }
+    tryMatch(io)
+    return
+  }
+
   const battleId = uuidv4()
   const firstTurn = Math.random() < 0.5 ? p1.userId : p2.userId
   const mode = p1.mode || 'freestyle'
   let topic = null
   if (mode === 'topic') {
     try {
-      topic = await generateTopic()
+      topic = await Promise.race([
+        generateTopic(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
+      ])
+      if (!topic) topic = 'Overhyped Tech Gadgets'
     } catch {
-      topic = 'group projects'
+      topic = 'Overhyped Tech Gadgets'
     }
+  }
+
+  const still1 = io.sockets.sockets.get(p1.socketId)
+  const still2 = io.sockets.sockets.get(p2.socketId)
+  if (!still1?.connected || !still2?.connected) {
+    console.warn('[Match] abort — socket lost after topic')
+    if (still1?.connected) matchmakingQueue.push(p1)
+    if (still2?.connected) matchmakingQueue.push(p2)
+    tryMatch(io)
+    return
   }
 
   const battle = {
@@ -516,6 +684,9 @@ async function matchPlayers(io, p1, p2) {
     createdAt: Date.now(),
     isPractice: false,
     roastSubmitted: false,
+    turnId: 0,
+    countdownActive: false,
+    turnLive: false,
   }
   activeBattles.set(battleId, battle)
   playerBattles.set(p1.socketId, battleId)
@@ -625,9 +796,9 @@ function finishRound(io, battle, round) {
   const first = battle.players.find((p) => p.userId === firstTurn)
   if (first?.socketId === 'bot') {
     const human = battle.players.find((p) => p.socketId !== 'bot')
-    botTurn(io, battle, human)
+    if (human) botTurn(io, battle, { id: human.socketId })
   } else if (first) {
-    startTurnTimer(io, battle, first.socketId, first.userId)
+    openHumanTurn(io, battle, first.socketId, first.userId)
   }
 }
 

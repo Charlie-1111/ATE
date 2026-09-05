@@ -5,7 +5,7 @@ import { useCharacterStore } from '../hooks/useCharacterStore.js'
 import { useUserStore } from '../hooks/useUserStore.js'
 import BattleRoom from '../components/battle/BattleRoom.jsx'
 import { motion } from 'framer-motion'
-import { GoldTeeth, DiamondBracelet } from '../components/decorations/index.jsx'
+import { UI } from '../lib/uiAssets.js'
 
 export default function PracticePage() {
   const userId = useUserStore((s) => s.userId)
@@ -22,18 +22,19 @@ export default function PracticePage() {
 
   if (battle.status === 'idle') {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6 px-4">
-        <GoldTeeth className="w-40 h-24" />
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6 px-4 relative overflow-hidden">
+        <img src={UI.heroBackdrop} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50 pointer-events-none" />
+        <img src={UI.logoHorizontal} alt="ATE" className="relative z-10 w-48" />
 
         <motion.h1
-          className="font-display text-5xl font-black text-accent-gold uppercase tracking-wider"
+          className="relative z-10 font-display text-5xl text-[var(--ate-gold)] uppercase tracking-wider"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
           Practice vs AI
         </motion.h1>
 
-        <p className="text-text-muted font-sans text-center">Hone your roast skills against a bot</p>
+        <p className="relative z-10 text-[var(--ate-grey)] text-center">Hone your roast skills against a bot</p>
 
         <div className="flex gap-3">
           <button
@@ -80,7 +81,7 @@ export default function PracticePage() {
         <button
           type="button"
           onClick={() => battle.findPractice(format, mode)}
-          className="mt-2 bg-accent-gold hover:bg-yellow-500 text-black font-display font-black text-lg px-10 py-3 rounded-lg border-4 border-black uppercase tracking-wider"
+          className="relative z-10 ate-btn-live max-w-xs mt-2"
         >
           Start Practice
         </button>
@@ -88,12 +89,12 @@ export default function PracticePage() {
         <button
           type="button"
           onClick={() => { window.location.href = '/' }}
-          className="text-text-muted text-sm mt-2 hover:text-accent-gold transition-colors font-display uppercase tracking-wider"
+          className="relative z-10 text-[var(--ate-grey)] text-sm mt-2 hover:text-[var(--ate-gold)] transition-colors font-display uppercase tracking-wider"
         >
           Back to Home
         </button>
 
-        <DiamondBracelet className="w-16 h-32 mt-8" />
+        <img src={UI.motifGrill} alt="" className="relative z-10 h-32 mt-4 opacity-80" />
       </div>
     )
   }

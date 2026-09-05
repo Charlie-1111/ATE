@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="MID">
+  <g transform="rotate(-3 100 100)">
+    <polygon points="100,10 172,44 190,120 100,192 10,120 28,44"
+             fill="#000000" transform="translate(6,7)"/>
+    <polygon points="100,10 172,44 190,120 100,192 10,120 28,44"
+             fill="#EDE3CF" stroke="#000000" stroke-width="12" stroke-linejoin="miter"/>
+    <polygon points="100,30 158,58 172,118 100,172 28,118 42,58"
+             fill="none" stroke="#5A5A5A" stroke-width="6"/>
+    <rect x="116" y="126" width="25" height="2.9" fill="#000000" opacity="0.25" transform="rotate(10 116 126)"/>
+    <rect x="156" y="49" width="17" height="2.9" fill="#000000" opacity="0.25" transform="rotate(6 156 49)"/>
+    <rect x="153" y="58" width="17" height="1.5" fill="#000000" opacity="0.25" transform="rotate(2 153 58)"/>
+    <rect x="110" y="47" width="11" height="1.6" fill="#000000" opacity="0.25" transform="rotate(17 110 47)"/>
+    <rect x="135" y="63" width="25" height="1.3" fill="#000000" opacity="0.25" transform="rotate(5 135 63)"/>
+    <rect x="51" y="46" width="27" height="1.4" fill="#000000" opacity="0.25" transform="rotate(-11 51 46)"/>
+    <rect x="164" y="140" width="13" height="2.9" fill="#000000" opacity="0.25" transform="rotate(2 164 140)"/>
+    <rect x="123" y="68" width="28" height="2.4" fill="#000000" opacity="0.25" transform="rotate(19 123 68)"/>
+    <rect x="152" y="78" width="15" height="1.3" fill="#000000" opacity="0.25" transform="rotate(-14 152 78)"/>
+    <rect x="43" y="79" width="20" height="1.0" fill="#000000" opacity="0.25" transform="rotate(7 43 79)"/>
+    <rect x="79" y="79" width="25" height="2.0" fill="#000000" opacity="0.25" transform="rotate(-7 79 79)"/>
+    <rect x="98" y="122" width="7" height="3.0" fill="#000000" opacity="0.25" transform="rotate(-19 98 122)"/>
+    <rect x="133" y="137" width="6" height="2.6" fill="#000000" opacity="0.25" transform="rotate(-5 133 137)"/>
+    <rect x="110" y="47" width="7" height="1.4" fill="#000000" opacity="0.25" transform="rotate(18 110 47)"/>
+    <path d="M71.20703125 118.0V83.625H81.67578125L84.56640625 104.58203125L87.4375 83.625H98.00390625V118.0H91.71484375V93.234375L87.76953125 118.0H81.59765625L77.41796875 93.234375V118.0Z M101.73828125 118.0V83.625H108.37890625V118.0Z M112.11328125 118.0V83.625H121.56640625Q125.27734375 83.625 127.15234375 85.685546875Q129.02734375 87.74609375 129.02734375 91.7109375V107.8046875Q129.02734375 112.6875 127.318359375 115.34375Q125.609375 118.0 121.33203125 118.0ZM119.02734375 111.92578125H120.21875Q122.11328125 111.92578125 122.11328125 110.08984375V92.35546875Q122.11328125 90.63671875 121.654296875 90.138671875Q121.1953125 89.640625 119.7890625 89.640625H119.02734375Z" fill="#000000"/>
+  </g>
+</svg>

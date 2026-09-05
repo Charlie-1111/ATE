@@ -33,6 +33,14 @@ export default function BattlePage() {
   }, [battle.winner, battle.battleId, setRankedWins])
 
   if (battle.status === 'idle') {
+    const errMsg = battle.queueError === 'connect_failed'
+      ? 'Could not connect to matchmaking. Check the server and try again.'
+      : battle.queueError === 'disconnected'
+        ? 'Disconnected while searching. Try again.'
+        : battle.queueError
+          ? `Queue error: ${battle.queueError}`
+          : null
+
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6 px-4">
         <motion.h1
@@ -43,6 +51,9 @@ export default function BattlePage() {
           Find Match
         </motion.h1>
         <p className="text-text-muted text-center">Pick a mode, format, then enter the arena</p>
+        {errMsg && (
+          <p className="text-[var(--ate-red)] text-sm font-mono text-center max-w-sm">{errMsg}</p>
+        )}
 
         <label className="flex flex-col gap-1 w-full max-w-xs">
           <span className="text-xs uppercase tracking-widest text-text-muted font-mono">Display name</span>
@@ -138,6 +149,12 @@ export default function BattlePage() {
         />
         <p className="text-lg text-accent-gold font-display uppercase tracking-wider">
           Searching ({mode} · {format === 'best_of_5' ? 'Bo5' : 'Bo3'})...
+        </p>
+        {battle.queuePosition != null && (
+          <p className="text-sm text-text-muted font-mono">Queue position: {battle.queuePosition}</p>
+        )}
+        <p className="text-xs text-text-muted font-mono max-w-xs text-center">
+          Waiting for another player with the same mode &amp; format
         </p>
         <button
           type="button"

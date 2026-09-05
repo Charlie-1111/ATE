@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" width="140" height="140" role="img" aria-label="Equipped">
+  <g transform="rotate(-10 70 70)">
+    <polygon points="70,6 134,40 134,100 70,134 6,100 6,40" fill="#C1121F" stroke="#000000" stroke-width="10" stroke-linejoin="miter"/>
+    <path d="M34,72 L60,96 L108,44" fill="none" stroke="#FFD700" stroke-width="16" stroke-linecap="square" stroke-linejoin="miter"/>
+    <rect x="72" y="95" width="23" height="1.6" fill="#000000" opacity="0.28" transform="rotate(11 72 95)"/>
+  <rect x="90" y="83" width="8" height="1.1" fill="#000000" opacity="0.28" transform="rotate(-5 90 83)"/>
+  <rect x="95" y="50" width="15" height="1.6" fill="#000000" opacity="0.28" transform="rotate(14 95 50)"/>
+  <rect x="115" y="62" width="24" height="1.1" fill="#000000" opacity="0.28" transform="rotate(13 115 62)"/>
+  <rect x="108" y="42" width="19" height="2.1" fill="#000000" opacity="0.28" transform="rotate(18 108 42)"/>
+  <rect x="41" y="73" width="22" height="2.3" fill="#000000" opacity="0.28" transform="rotate(-8 41 73)"/>
+  <rect x="28" y="105" width="15" height="3.0" fill="#000000" opacity="0.28" transform="rotate(-14 28 105)"/>
+  <rect x="101" y="95" width="23" height="1.0" fill="#000000" opacity="0.28" transform="rotate(-5 101 95)"/>
+  <rect x="25" y="90" width="12" height="2.9" fill="#000000" opacity="0.28" transform="rotate(-5 25 90)"/>
+  <rect x="97" y="99" width="10" height="2.1" fill="#000000" opacity="0.28" transform="rotate(18 97 99)"/>
+  </g>
+</svg>
