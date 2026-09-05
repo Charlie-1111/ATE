@@ -1,0 +1,102 @@
+[
+  {
+    "id": "vanta",
+    "name": "Vanta",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  },
+  {
+    "id": "solara",
+    "name": "Solara",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  },
+  {
+    "id": "brickz",
+    "name": "Brickz",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  },
+  {
+    "id": "nyx",
+    "name": "Nyx",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  },
+  {
+    "id": "riff",
+    "name": "Riff",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  },
+  {
+    "id": "koko",
+    "name": "Koko",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  },
+  {
+    "id": "torque",
+    "name": "Torque",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  },
+  {
+    "id": "velvet",
+    "name": "Velvet",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  },
+  {
+    "id": "riot",
+    "name": "Riot",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  },
+  {
+    "id": "echo",
+    "name": "Echo",
+    "animations": [
+      "idle",
+      "roast",
+      "hit",
+      "victory"
+    ]
+  }
+]

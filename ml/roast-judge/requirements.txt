@@ -1,0 +1,11 @@
+# Train / eval on a GPU machine (not required for the ATE game server).
+torch>=2.2.0
+transformers>=4.44.0
+datasets>=2.20.0
+accelerate>=0.33.0
+peft>=0.12.0
+bitsandbytes>=0.43.0
+trl>=0.9.0
+unsloth; platform_system != "Darwin" or platform_machine == "arm64"
+# If Unsloth install fails on your platform, follow https://github.com/unslothai/unsloth
+requests>=2.32.0
