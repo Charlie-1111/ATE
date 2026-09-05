@@ -1,31 +1,27 @@
-# ATE — single service (API + Socket.IO + Vite static)
-FROM node:20-alpine AS build
-WORKDIR /app
+# Hugging Face Spaces / any free Docker host
+# Listens on PORT (HF defaults to 7860)
+FROM node:20-slim
 
-COPY package.json package-lock.json ./
-COPY client/package.json ./client/
-COPY server/package.json ./server/
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    NODE_ENV=production \
+    PORT=7860
+
+WORKDIR $HOME/app
+
+COPY --chown=user package.json package-lock.json ./
+COPY --chown=user client/package.json ./client/
+COPY --chown=user server/package.json ./server/
 
 RUN npm ci
 
-COPY client ./client
-COPY server ./server
+COPY --chown=user client ./client
+COPY --chown=user server ./server
 
-RUN npm run build --workspace=client
+RUN npm run build --workspace=client \
+  && npm prune --omit=dev
 
-FROM node:20-alpine
-WORKDIR /app
-ENV NODE_ENV=production
-
-COPY package.json package-lock.json ./
-COPY client/package.json ./client/
-COPY server/package.json ./server/
-RUN npm ci --omit=dev
-
-COPY server ./server
-COPY --from=build /app/client/dist ./client/dist
-
-# Render / Fly / others inject PORT
-ENV PORT=8080
-EXPOSE 8080
+EXPOSE 7860
 CMD ["node", "server/index.js"]
