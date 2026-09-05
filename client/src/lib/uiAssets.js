@@ -5,7 +5,7 @@ export const UI = {
   logoSquare: '/ui/logo-ate-square.svg',
   favicon: '/ui/favicon.svg',
   heroBackdrop: '/ui/hero-backdrop.svg',
-  homeArenaBg: '/ui/home-arena-bg.png',
+  homeArenaBg: '/ui/home-arena-bg.svg',
   homeBgm: '/audio/arena-pressure.m4a',
   btnGold: '/ui/btn-gold.svg',
   btnGoldPressed: '/ui/btn-gold-pressed.svg',

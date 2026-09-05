@@ -79,7 +79,10 @@ export default function HomePage() {
       <img
         src={UI.homeArenaBg}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none select-none"
+        style={{ imageRendering: 'auto' }}
+        decoding="async"
+        draggable={false}
       />
 
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
