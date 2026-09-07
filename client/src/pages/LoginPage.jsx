@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import api from '../lib/api.js'
 import { useUserStore } from '../hooks/useUserStore.js'
 import { UI } from '../lib/uiAssets.js'
+import { initCrazyGames, isCrazyGamesHost } from '../lib/crazygames.js'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -12,6 +13,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [cgBlocked, setCgBlocked] = useState(false)
+
+  useEffect(() => {
+    initCrazyGames().then(() => {
+      if (isCrazyGamesHost()) setCgBlocked(true)
+    })
+  }, [])
+
+  if (cgBlocked) return <Navigate to="/" replace />
 
   async function onSubmit(e) {
     e.preventDefault()

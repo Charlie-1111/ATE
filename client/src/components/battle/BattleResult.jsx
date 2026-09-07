@@ -1,6 +1,9 @@
+import { useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { formatTotal } from '../../lib/scoring.js'
 import { UI } from '../../lib/uiAssets.js'
+import { playSfx } from '../../lib/audio.js'
+import { PLAY_URL } from '../../lib/playUrl.js'
 
 export default function BattleResult({
   winner,
@@ -10,9 +13,29 @@ export default function BattleResult({
   opponentTotalScore,
   myName,
   opponentName,
+  messages = [],
+  onRematch,
+  onPracticeAgain,
+  isPractice = false,
 }) {
   const isWinner = winner === 'me'
   const isDraw = winner === 'draw'
+  const disconnected = winner === 'opponent_disconnected'
+
+  const bestRoast = useMemo(() => {
+    const mine = (messages || []).filter((m) => m.isMe && m.text && !m.isTimeout)
+    if (!mine.length) return null
+    return mine.reduce((a, b) => ((b.marks ?? 0) >= (a.marks ?? 0) ? b : a))
+  }, [messages])
+
+  useEffect(() => {
+    if (isWinner) playSfx('win')
+    else if (!isDraw) playSfx('lose')
+  }, [isWinner, isDraw])
+
+  const shareText = encodeURIComponent(
+    `I just ${isWinner ? 'won' : 'battled'} on ATE — ${formatTotal(myTotalScore ?? 0)} marks. ${PLAY_URL}`,
+  )
 
   return (
     <motion.div
@@ -22,7 +45,13 @@ export default function BattleResult({
     >
       <img src={UI.washSpotlight} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none" />
 
-      {!isDraw && (
+      {disconnected && (
+        <h2 className="relative z-10 font-display text-4xl text-[var(--ate-gold)] uppercase tracking-wider text-center">
+          Opponent disconnected
+        </h2>
+      )}
+
+      {!isDraw && !disconnected && (
         <motion.img
           src={isWinner ? UI.bannerVictory : UI.bannerDefeat}
           alt={isWinner ? 'Victory' : 'Defeat'}
@@ -60,12 +89,52 @@ export default function BattleResult({
         </div>
       </motion.div>
 
+      {bestRoast && (
+        <p className="relative z-10 text-center max-w-md text-[var(--ate-bone)] italic text-sm">
+          Best bar: “{bestRoast.text}” · {bestRoast.marks}/10
+        </p>
+      )}
+
+      <div className="relative z-10 flex flex-col sm:flex-row gap-3 w-full max-w-md">
+        <motion.button
+          type="button"
+          className="ate-btn-live flex-1"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          onClick={() => (isPractice ? onPracticeAgain?.() : onRematch?.())}
+        >
+          {isPractice ? 'Practice again' : 'Rematch'}
+        </motion.button>
+        {!isPractice && onPracticeAgain && (
+          <motion.button
+            type="button"
+            className="flex-1 bg-[var(--ate-ink)] border-4 border-[var(--ate-gold)] text-[var(--ate-gold)] font-display uppercase tracking-wider py-3 rounded-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.55 }}
+            onClick={() => onPracticeAgain?.()}
+          >
+            Vs AI
+          </motion.button>
+        )}
+      </div>
+
+      <a
+        className="relative z-10 text-sm text-[var(--ate-grey)] hover:text-[var(--ate-gold)] font-mono underline"
+        href={`https://twitter.com/intent/tweet?text=${shareText}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Share result
+      </a>
+
       <motion.button
         type="button"
-        className="relative z-10 ate-btn-live max-w-xs"
+        className="relative z-10 text-[var(--ate-grey)] font-display uppercase tracking-wider text-sm"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
+        transition={{ delay: 0.7 }}
         onClick={() => { window.location.href = '/' }}
       >
         Back to Home

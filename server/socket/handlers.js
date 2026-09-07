@@ -11,6 +11,12 @@ const START_SCORE = 0
 const TURN_TIME_MS = 20000
 const COIN_DRAW_MS = 2500
 const TURN_COUNTDOWN_SECS = Number(process.env.ATE_TURN_COUNTDOWN_SECS) || 3
+const DISCONNECT_GRACE_MS = Number(process.env.ATE_DISCONNECT_GRACE_MS) || 20000
+const ROUND_PAUSE_MS = Number(process.env.ATE_ROUND_PAUSE_MS) || 2800
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms))
+}
 
 const BOT_NAMES = [
   'Chef LoudMouth', 'RoastBot 3000', 'Savage.exe', 'Toasty McBurns',
@@ -177,13 +183,16 @@ function setupSocketHandlers(io) {
         topic = await generateTopic()
       }
 
+      const FREE_BOT_CHARS = ['static', 'lil_grid', 'young_vector', 'poly_flow']
+      const botChar = FREE_BOT_CHARS[Math.floor(Math.random() * FREE_BOT_CHARS.length)]
       const botPlayer = {
         socketId: 'bot',
         userId: BOT_USER_ID,
         format,
         mode: battleMode,
         displayName: botName,
-        characterId: 'lil_grid',
+        characterId: botChar,
+        avatarId: botChar,
         joinedAt: Date.now(),
       }
       const humanPlayer = {
@@ -273,7 +282,26 @@ function setupSocketHandlers(io) {
       if (opponent && opponent.socketId !== 'bot') io.to(opponent.socketId).emit('opponent_stopped_typing')
     })
 
-    socket.on('roast_sent', async ({ battleId, text, isTimeout, userId }) => {
+    socket.on('request_battle_state', ({ battleId, userId }) => {
+      const battle = activeBattles.get(battleId)
+      if (!battle || battle.status !== 'active') {
+        socket.emit('roast_error', { error: 'no_battle', battleId })
+        return
+      }
+      const player = resolvePlayer(battle, socket, userId)
+      if (!player) {
+        socket.emit('roast_error', { error: 'not_in_battle', battleId })
+        return
+      }
+      const snap = battleSnapshot(battle, player.userId)
+      if (snap) socket.emit('battle_state', snap)
+      const opp = getOpponent(battle, socket.id)
+      if (opp && opp.socketId !== 'bot') {
+        io.to(opp.socketId).emit('opponent_stopped_typing')
+      }
+    })
+
+    socket.on('roast_sent', async ({ battleId, text, isTimeout, userId, turnId: clientTurnId }) => {
       const battle = activeBattles.get(battleId)
       if (!battle) {
         socket.emit('roast_error', { error: 'no_battle', battleId })
@@ -287,6 +315,10 @@ function setupSocketHandlers(io) {
       }
       if (battle.currentTurn !== player.userId) {
         socket.emit('roast_error', { error: 'not_your_turn', battleId, currentTurn: battle.currentTurn })
+        return
+      }
+      if (clientTurnId != null && battle.turnId != null && Number(clientTurnId) !== Number(battle.turnId)) {
+        socket.emit('roast_error', { error: 'stale_turn', battleId })
         return
       }
       if (battle.roastSubmitted) {
@@ -303,6 +335,10 @@ function setupSocketHandlers(io) {
       }
       if (!battle.turnLive) {
         socket.emit('roast_error', { error: 'turn_not_live', battleId })
+        return
+      }
+      if (text && text.length > 300) {
+        socket.emit('roast_error', { error: 'invalid_roast', battleId })
         return
       }
 
@@ -323,6 +359,7 @@ function setupSocketHandlers(io) {
           text: '[No roast submitted]',
           isTimeout: true,
         })
+        payload.scoredBy = 'timeout'
         socket.emit('roast_scored', payload)
       } else {
         const result = await scoreRoastBounded(text, scoreCtx(battle, player.userId))
@@ -343,6 +380,10 @@ function setupSocketHandlers(io) {
           text: text.trim(),
           blocked: result.blocked,
         })
+        const src = result.source || ''
+        payload.scoredBy = src.includes('timeout') || src.includes('error') || src === 'heuristic'
+          ? 'heuristic'
+          : (result.blocked ? 'blocked' : 'ai')
         socket.emit('roast_scored', payload)
       }
 
@@ -371,18 +412,28 @@ function setupSocketHandlers(io) {
 
       const battleId = playerBattles.get(socket.id)
       if (battleId) {
-        clearTurnTimer(battleId)
         const battle = activeBattles.get(battleId)
         if (battle && battle.status === 'active') {
+          const opponent = getOpponent(battle, socket.id)
+          if (opponent && opponent.socketId !== 'bot') {
+            io.to(opponent.socketId).emit('opponent_reconnecting')
+          }
+          clearDisconnectTimeout(battle)
+          const departedSocketId = socket.id
           battle.disconnectTimeout = setTimeout(() => {
-            const opponent = getOpponent(battle, socket.id)
-            if (opponent && opponent.socketId !== 'bot') {
-              io.to(opponent.socketId).emit('opponent_disconnected')
+            if (!activeBattles.has(battleId) || battle.status !== 'active') return
+            const departed = battle.players.find((p) => p.userId && p.socketId === departedSocketId)
+            // Reconnected (socket rebound) — grace cancelled effectively
+            if (!departed) return
+            const opp = battle.players.find((p) => p !== departed)
+            if (opp && opp.socketId !== 'bot') {
+              io.to(opp.socketId).emit('opponent_disconnected')
             }
+            clearTurnTimer(battleId)
             activeBattles.delete(battleId)
-            playerBattles.delete(socket.id)
-            if (opponent) playerBattles.delete(opponent.socketId)
-          }, 5000)
+            playerBattles.delete(departedSocketId)
+            if (opp) playerBattles.delete(opp.socketId)
+          }, DISCONNECT_GRACE_MS)
         }
       }
     })
@@ -491,9 +542,54 @@ function clearTurnTimer(battleId) {
   }
 }
 
+function clearDisconnectTimeout(battle) {
+  if (battle?.disconnectTimeout) {
+    clearTimeout(battle.disconnectTimeout)
+    battle.disconnectTimeout = null
+  }
+}
+
+function battleSnapshot(battle, forUserId) {
+  const me = battle.players.find((p) => p.userId === forUserId)
+  const opp = battle.players.find((p) => p.userId !== forUserId)
+  if (!me || !opp) return null
+  const scores = battle.roundScores[battle.currentRound] || {}
+  const mySlot = me === battle.players[0] ? 'player1' : 'player2'
+  const oppSlot = mySlot === 'player1' ? 'player2' : 'player1'
+  return {
+    battleId: battle.id,
+    status: battle.status,
+    format: battle.format,
+    mode: battle.mode,
+    topic: battle.topic,
+    currentRound: battle.currentRound,
+    isMyTurn: battle.currentTurn === forUserId,
+    turnLive: !!battle.turnLive && battle.currentTurn === forUserId,
+    countdownSec: battle.countdownActive && battle.currentTurn === forUserId
+      ? TURN_COUNTDOWN_SECS
+      : 0,
+    firstTurnUserId: battle.firstTurnUserId ?? null,
+    myScore: scores[mySlot] ?? 0,
+    opponentScore: scores[oppSlot] ?? 0,
+    myTotalScore: battle.totalScore[me.userId] ?? 0,
+    opponentTotalScore: battle.totalScore[opp.userId] ?? 0,
+    myRoundWins: me.roundWins || 0,
+    opponentRoundWins: opp.roundWins || 0,
+    opponent: {
+      userId: opp.userId,
+      name: opp.displayName,
+      characterId: opp.characterId || opp.avatarId,
+      avatarId: opp.avatarId || opp.characterId,
+    },
+  }
+}
+
 function resolvePlayer(battle, socket, userId) {
   let player = battle.players.find((p) => p.socketId === socket.id)
-  if (player) return player
+  if (player) {
+    clearDisconnectTimeout(battle)
+    return player
+  }
   if (!userId) return null
   player = battle.players.find((p) => p.userId === userId && p.socketId !== 'bot')
   if (!player) return null
@@ -502,6 +598,7 @@ function resolvePlayer(battle, socket, userId) {
   if (prev && prev !== socket.id) playerBattles.delete(prev)
   player.socketId = socket.id
   playerBattles.set(socket.id, battle.id)
+  clearDisconnectTimeout(battle)
   console.log(`[Socket] rebound ${userId} ${prev} → ${socket.id}`)
   return player
 }
@@ -637,10 +734,6 @@ const FALLBACK_ROASTS = [
 
 function fallbackRoast() {
   return FALLBACK_ROASTS[Math.floor(Math.random() * FALLBACK_ROASTS.length)]
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function tryMatch(io) {
@@ -788,7 +881,7 @@ function emitBattleEnded(io, battle, winnerIdx) {
   }
 }
 
-function finishRound(io, battle, round) {
+async function finishRound(io, battle, round) {
   if (!activeBattles.has(battle.id) || battle.status !== 'active') return
 
   const scores = battle.roundScores[round]
@@ -808,6 +901,27 @@ function finishRound(io, battle, round) {
   const p1Wins = battle.players[0].roundWins || 0
   const p2Wins = battle.players[1].roundWins || 0
   const winsNeeded = battle.format === 'best_of_5' ? 3 : 2
+
+  // Inter-round ceremony before next turn (or match end celebration on client)
+  for (const me of battle.players) {
+    if (me.socketId === 'bot') continue
+    const mySlot = me === battle.players[0] ? 'player1' : 'player2'
+    const oppSlot = mySlot === 'player1' ? 'player2' : 'player1'
+    const myWins = me === battle.players[0] ? p1Wins : p2Wins
+    const oppWins = me === battle.players[0] ? p2Wins : p1Wins
+    io.to(me.socketId).emit('round_complete', {
+      round,
+      myMarks: scores[mySlot],
+      opponentMarks: scores[oppSlot],
+      myRoundWins: myWins,
+      opponentRoundWins: oppWins,
+      youWonRound: roundWinner >= 0 && battle.players[roundWinner] === me,
+      matchOver: p1Wins >= winsNeeded || p2Wins >= winsNeeded,
+    })
+  }
+
+  await sleep(ROUND_PAUSE_MS)
+  if (!activeBattles.has(battle.id) || battle.status !== 'active') return
 
   if (p1Wins >= winsNeeded || p2Wins >= winsNeeded) {
     const winnerIdx = p1Wins >= winsNeeded ? 0 : 1

@@ -7,6 +7,8 @@ import BattleRoom from '../components/battle/BattleRoom.jsx'
 import { motion } from 'framer-motion'
 import { UI } from '../lib/uiAssets.js'
 
+const TIP_KEY = 'ate-practice-tip-seen'
+
 export default function PracticePage() {
   const userId = useUserStore((s) => s.userId)
   const displayName = useUserStore((s) => s.displayName)
@@ -15,10 +17,26 @@ export default function PracticePage() {
   const characterId = useCharacterStore((s) => s.characterId)
   const [mode, setMode] = useState('freestyle')
   const [format, setFormat] = useState('best_of_3')
+  const [showTip, setShowTip] = useState(() => {
+    try {
+      return localStorage.getItem(TIP_KEY) !== '1'
+    } catch {
+      return true
+    }
+  })
 
   useEffect(() => {
     join(userId)
-  }, [userId])
+  }, [userId, join])
+
+  const dismissTip = () => {
+    setShowTip(false)
+    try {
+      localStorage.setItem(TIP_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+  }
 
   if (battle.status === 'idle') {
     return (
@@ -35,6 +53,21 @@ export default function PracticePage() {
         </motion.h1>
 
         <p className="relative z-10 text-[var(--ate-grey)] text-center">Hone your roast skills against a bot</p>
+
+        {showTip && (
+          <div className="relative z-10 max-w-sm bg-[var(--ate-ink)] border-2 border-[var(--ate-gold)] rounded-lg p-4 text-center">
+            <p className="text-[var(--ate-bone)] text-sm font-mono">
+              20s clock · write a real roast · marks add up · best of 3 or 5
+            </p>
+            <button
+              type="button"
+              onClick={dismissTip}
+              className="mt-3 text-xs uppercase tracking-wider text-[var(--ate-gold)] font-display"
+            >
+              Got it
+            </button>
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button
@@ -80,7 +113,10 @@ export default function PracticePage() {
 
         <button
           type="button"
-          onClick={() => battle.findPractice(format, mode)}
+          onClick={() => {
+            dismissTip()
+            battle.findPractice(format, mode)
+          }}
           className="relative z-10 ate-btn-live max-w-xs mt-2"
         >
           Start Practice
@@ -144,8 +180,19 @@ export default function PracticePage() {
       messages={battle.messages}
       winner={battle.winner}
       onSendRoast={battle.sendRoast}
+      onStartTyping={battle.startTyping}
+      onStopTyping={battle.stopTyping}
+      judging={battle.judging}
+      toast={battle.toast}
+      onClearToast={battle.clearToast}
+      connectionStatus={battle.connectionStatus}
+      showRoundTransition={battle.showRoundTransition}
+      roundTransition={battle.roundTransition}
       myName={displayName}
       characterId={characterId}
+      onRematch={() => battle.rematch(true)}
+      onPracticeAgain={() => battle.rematch(true)}
+      isPractice
     />
   )
 }

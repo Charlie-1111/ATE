@@ -6,6 +6,8 @@ import { useUserStore } from '../hooks/useUserStore.js'
 import BattleRoom from '../components/battle/BattleRoom.jsx'
 import { motion } from 'framer-motion'
 
+const QUEUE_FALLBACK_MS = 45000
+
 export default function BattlePage() {
   const userId = useUserStore((s) => s.userId)
   const displayName = useUserStore((s) => s.displayName)
@@ -18,12 +20,12 @@ export default function BattlePage() {
   const [mode, setMode] = useState('freestyle')
   const [format, setFormat] = useState('best_of_3')
   const [nameDraft, setNameDraft] = useState(displayName)
+  const [queueWait, setQueueWait] = useState(0)
 
   useEffect(() => {
     join(userId)
-  }, [userId])
+  }, [userId, join])
 
-  // Ranked PvP win → unlock progress (practice does not use this page)
   useEffect(() => {
     if (battle.winner !== 'me' || !battle.battleId) return
     if (creditedWin.current === battle.battleId) return
@@ -31,6 +33,17 @@ export default function BattlePage() {
     const current = useCharacterStore.getState().rankedWins
     setRankedWins(current + 1)
   }, [battle.winner, battle.battleId, setRankedWins])
+
+  useEffect(() => {
+    if (battle.status !== 'queued' || !battle.queueStartedAt) {
+      setQueueWait(0)
+      return undefined
+    }
+    const tick = () => setQueueWait(Date.now() - battle.queueStartedAt)
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [battle.status, battle.queueStartedAt])
 
   if (battle.status === 'idle') {
     const errMsg = battle.queueError === 'connect_failed'
@@ -140,22 +153,35 @@ export default function BattlePage() {
   }
 
   if (battle.status === 'queued') {
+    const showFallback = queueWait >= QUEUE_FALLBACK_MS
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6 px-4">
         <motion.div
           className="w-16 h-16 border-4 border-accent-gold border-t-transparent rounded-full"
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
         />
         <p className="text-lg text-accent-gold font-display uppercase tracking-wider">
-          Searching ({mode} · {format === 'best_of_5' ? 'Bo5' : 'Bo3'})...
+          Searching ({battle.mode} · {battle.format === 'best_of_5' ? 'Bo5' : 'Bo3'})...
         </p>
         {battle.queuePosition != null && (
           <p className="text-sm text-text-muted font-mono">Queue position: {battle.queuePosition}</p>
         )}
         <p className="text-xs text-text-muted font-mono max-w-xs text-center">
-          Waiting for another player with the same mode &amp; format
+          Waiting {Math.floor(queueWait / 1000)}s · same mode &amp; format
         </p>
+        {showFallback && (
+          <button
+            type="button"
+            onClick={() => {
+              battle.leaveQueue()
+              setTimeout(() => battle.findPractice(battle.format || format, battle.mode || mode), 50)
+            }}
+            className="bg-accent-gold text-black font-display uppercase tracking-wider px-6 py-3 rounded-lg border-4 border-black"
+          >
+            Play vs AI instead
+          </button>
+        )}
         <button
           type="button"
           onClick={() => battle.leaveQueue()}
@@ -192,8 +218,19 @@ export default function BattlePage() {
       messages={battle.messages}
       winner={battle.winner}
       onSendRoast={battle.sendRoast}
+      onStartTyping={battle.startTyping}
+      onStopTyping={battle.stopTyping}
+      judging={battle.judging}
+      toast={battle.toast}
+      onClearToast={battle.clearToast}
+      connectionStatus={battle.connectionStatus}
+      showRoundTransition={battle.showRoundTransition}
+      roundTransition={battle.roundTransition}
       myName={displayName}
       characterId={characterId}
+      onRematch={() => battle.rematch(false)}
+      onPracticeAgain={() => battle.rematch(true)}
+      isPractice={false}
     />
   )
 }

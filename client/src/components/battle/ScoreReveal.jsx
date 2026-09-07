@@ -7,7 +7,7 @@ export default function ScoreReveal({ result, isVisible }) {
 
   const marks = Number(result.marks ?? result.quality ?? result.score) || 0
   const tier = getScoreTier(marks)
-  const feedback = result.feedback || tier.label
+  const feedback = String(result.feedback || tier.label || 'MID').toUpperCase()
   const stamp = result.isTimeout
     ? UI.stampTimeout
     : result.blocked
@@ -20,23 +20,32 @@ export default function ScoreReveal({ result, isVisible }) {
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.5, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-      className="flex flex-col items-center gap-4 py-6 px-4"
+      className="flex flex-col items-center gap-3 py-6 px-4"
     >
+      <motion.p
+        className="font-display text-5xl md:text-6xl text-[var(--ate-gold)] uppercase tracking-wider drop-shadow-[4px_4px_0_#000]"
+        initial={{ y: -12, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+      >
+        {feedback}
+      </motion.p>
+
       <motion.img
         src={stamp}
         alt={feedback}
-        className="w-48 h-auto drop-shadow-[4px_4px_0_#000]"
+        className="w-40 h-auto drop-shadow-[4px_4px_0_#000]"
         initial={{ rotate: -12, scale: 0.6 }}
         animate={{ rotate: -4, scale: 1 }}
         transition={{ type: 'spring', stiffness: 260 }}
       />
 
-      <p className="font-display text-4xl text-[var(--ate-gold)] uppercase tracking-wider">
+      <p className="font-display text-4xl text-[var(--ate-bone)] uppercase tracking-wider">
         {formatScore(marks)}/10
       </p>
 
       <p className="text-sm text-[var(--ate-grey)] font-mono">
         total {formatTotal(result.newTotal ?? marks)}
+        {result.scoredBy === 'heuristic' ? ' · quick judge' : ''}
       </p>
 
       {result.text && !result.isTimeout && (

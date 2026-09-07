@@ -1,111 +1,44 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import CharacterViewer from '../components/character/CharacterViewer.jsx'
 import { useCharacterStore } from '../hooks/useCharacterStore.js'
-import { useUserStore } from '../hooks/useUserStore.js'
-import api from '../lib/api.js'
 import {
   CHARACTERS,
   DEFAULT_CHARACTER_ID,
   getCharacter,
   isUnlocked,
   unlockHint,
+  characterModelUrl,
 } from '../lib/characterCatalog.js'
 import { UI } from '../lib/uiAssets.js'
+import { prefetchGltf } from '../lib/gltfCache.js'
 
 export default function ShopPage() {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
   const {
     characterId,
     rankedWins,
-    purchasedIds,
     selectCharacter,
-    unlockPremium,
-    syncPurchases,
     resetCharacter,
   } = useCharacterStore()
-  const isAuthed = useUserStore((s) => s.isAuthed)
   const [previewId, setPreviewId] = useState(characterId)
   const [hoverId, setHoverId] = useState(null)
-  const [buyingId, setBuyingId] = useState(null)
-  const [shopMsg, setShopMsg] = useState('')
   const preview = getCharacter(previewId)
   const dirty = previewId !== characterId
 
-  const refreshPurchases = useCallback(async () => {
-    if (!isAuthed) return
-    try {
-      const { data } = await api.get('/checkout/purchases')
-      if (data.purchasedIds?.length) syncPurchases(data.purchasedIds)
-    } catch {
-      // ignore — guest / offline
-    }
-  }, [isAuthed, syncPurchases])
+  useEffect(() => {
+    prefetchGltf(characterModelUrl(previewId))
+  }, [previewId])
 
   useEffect(() => {
-    refreshPurchases()
-  }, [refreshPurchases])
-
-  useEffect(() => {
-    const status = searchParams.get('checkout')
-    const character = searchParams.get('character')
-    if (!status) return
-
-    if (status === 'success') {
-      setShopMsg(character ? `Unlocked ${getCharacter(character).name}!` : 'Purchase complete!')
-      if (character) {
-        unlockPremium(character)
-        setPreviewId(character)
-      }
-      refreshPurchases()
-    } else if (status === 'cancel') {
-      setShopMsg('Checkout cancelled')
-    }
-    setSearchParams({}, { replace: true })
-  }, [searchParams, setSearchParams, unlockPremium, refreshPurchases])
+    if (hoverId) prefetchGltf(characterModelUrl(hoverId))
+  }, [hoverId])
 
   const confirmEquip = () => {
     if (!dirty) return
     if (selectCharacter(previewId)) {
       setPreviewId(previewId)
-    }
-  }
-
-  const buyPremium = async (char) => {
-    if (!isAuthed) {
-      setShopMsg('Log in to buy premium characters')
-      navigate('/login')
-      return
-    }
-    setBuyingId(char.id)
-    setShopMsg('')
-    try {
-      const { data } = await api.post('/checkout/session', { characterId: char.id })
-      if (data.alreadyOwned) {
-        syncPurchases(data.purchasedIds || [char.id])
-        unlockPremium(char.id)
-        setPreviewId(char.id)
-        setShopMsg(`You already own ${char.name}`)
-        return
-      }
-      if (data.purchasedIds) syncPurchases(data.purchasedIds)
-      if (data.mock && data.url) {
-        unlockPremium(char.id)
-        setPreviewId(char.id)
-        setShopMsg(`Unlocked ${char.name} (dev mock)`)
-        return
-      }
-      if (data.url) {
-        window.location.href = data.url
-        return
-      }
-      setShopMsg('Checkout failed — no redirect URL')
-    } catch (err) {
-      setShopMsg(err.response?.data?.error || 'Checkout failed')
-    } finally {
-      setBuyingId(null)
     }
   }
 
@@ -118,37 +51,21 @@ export default function ShopPage() {
           <img src={UI.logoSquare} alt="ATE" className="w-10 h-10" />
           <div>
             <p className="text-xs uppercase tracking-widest text-[var(--ate-grey)] font-mono">
-              {rankedWins} ranked win{rankedWins === 1 ? '' : 's'}
+              {rankedWins} ranked win{rankedWins === 1 ? '' : 's'} · unlock with wins
             </p>
             <h1 className="font-display text-xl text-[var(--ate-gold)] uppercase tracking-wider">
               Characters
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {!isAuthed && (
-            <Link
-              to="/login"
-              className="font-display text-xs uppercase tracking-wider text-[var(--ate-gold)] hidden sm:inline"
-            >
-              Log in to buy
-            </Link>
-          )}
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="font-display text-sm uppercase tracking-wider text-[var(--ate-grey)] hover:text-[var(--ate-bone)] border-2 border-gray-700 px-4 py-2 rounded-lg"
-          >
-            Back to Home
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="font-display text-sm uppercase tracking-wider text-[var(--ate-grey)] hover:text-[var(--ate-bone)] border-2 border-gray-700 px-4 py-2 rounded-lg"
+        >
+          Back to Home
+        </button>
       </header>
-
-      {shopMsg && (
-        <p className="relative z-10 text-center text-sm font-display uppercase tracking-wider text-[var(--ate-gold)] py-2 bg-[var(--ate-ink)] border-b border-gray-800">
-          {shopMsg}
-        </p>
-      )}
 
       <div className="relative z-10 flex-1 flex flex-col lg:flex-row gap-6 p-4 lg:p-8 max-w-6xl mx-auto w-full">
         <aside className="flex flex-col items-center gap-4 lg:w-80 flex-shrink-0">
@@ -213,8 +130,8 @@ export default function ShopPage() {
             {CHARACTERS.map((char) => {
               const equipped = characterId === char.id
               const previewing = previewId === char.id
-              const unlocked = isUnlocked(char.id, { wins: rankedWins, purchasedIds })
-              const hint = unlockHint(char.id, { wins: rankedWins, purchasedIds })
+              const unlocked = isUnlocked(char.id, { wins: rankedWins })
+              const hint = unlockHint(char.id, { wins: rankedWins })
               const showLive = previewing || hoverId === char.id
 
               return (
@@ -251,13 +168,6 @@ export default function ShopPage() {
                         className="absolute inset-0 w-full h-full object-cover rounded-xl pointer-events-none"
                       />
                     )}
-                    {char.rarity === 'premium' && (
-                      <img
-                        src={UI.tagPremium}
-                        alt="Premium"
-                        className="absolute -top-2 -right-2 w-16 h-auto z-10"
-                      />
-                    )}
                     {equipped && unlocked && (
                       <img
                         src={UI.stampEquipped}
@@ -279,18 +189,6 @@ export default function ShopPage() {
                     >
                       {equipped ? 'Equipped' : previewing ? 'Selected' : 'Preview'}
                     </span>
-                  ) : char.rarity === 'premium' ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        buyPremium(char)
-                      }}
-                      disabled={buyingId === char.id}
-                      className="text-xs font-display uppercase tracking-wider px-3 py-1 rounded border-2 border-[var(--ate-gold)] text-[var(--ate-gold)] hover:bg-[var(--ate-gold)] hover:text-black disabled:opacity-50"
-                    >
-                      {buyingId === char.id ? '…' : `Buy ${char.price}`}
-                    </button>
                   ) : (
                     <p className="text-[10px] text-[var(--ate-grey)] font-mono text-center px-1">{hint}</p>
                   )}

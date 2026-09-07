@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import {
   characterModelUrl,
@@ -8,8 +7,7 @@ import {
   getCharacter,
   resolveClipName,
 } from '../../lib/characterCatalog.js'
-
-const loader = new GLTFLoader()
+import { loadGltfCached } from '../../lib/gltfCache.js'
 
 function FallbackMark({ name, size, detail }) {
   return (
@@ -30,11 +28,16 @@ function FallbackMark({ name, size, detail }) {
   )
 }
 
+function isMobileDpr() {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(max-width: 768px), (pointer: coarse)').matches
+}
+
 /**
  * Vanilla Three.js GLB viewer.
  * `live={false}` → name card only (leaderboard / idle grid).
  */
-export default function CharacterViewer({
+function CharacterViewer({
   characterId = DEFAULT_CHARACTER_ID,
   animation = 'idle',
   size = 128,
@@ -48,6 +51,23 @@ export default function CharacterViewer({
   const [err, setErr] = useState('')
   const animRef = useRef(animation)
   animRef.current = animation
+  const mixerRef = useRef(null)
+  const clipsRef = useRef(null)
+  const actionRef = useRef(null)
+
+  // Swap animation clip without remounting the scene
+  useEffect(() => {
+    const mixer = mixerRef.current
+    const clips = clipsRef.current
+    if (!mixer || !clips) return
+    const clipName = resolveClipName(animation || 'idle', clips)
+    const clip = (clipName && clips[clipName]) || clips.idle || Object.values(clips)[0]
+    if (!clip) return
+    actionRef.current?.fadeOut(0.15)
+    const next = mixer.clipAction(clip)
+    next.reset().fadeIn(0.15).play()
+    actionRef.current = next
+  }, [animation])
 
   useEffect(() => {
     if (!live) return undefined
@@ -59,6 +79,8 @@ export default function CharacterViewer({
     let scene
     let camera
     let root = null
+    let visible = true
+    let pageVisible = typeof document === 'undefined' || document.visibilityState !== 'hidden'
 
     const canvas = canvasRef.current
     if (!canvas) {
@@ -67,14 +89,30 @@ export default function CharacterViewer({
       return undefined
     }
 
+    const io = typeof IntersectionObserver !== 'undefined'
+      ? new IntersectionObserver(
+        ([entry]) => {
+          visible = entry.isIntersecting
+        },
+        { threshold: 0.05 },
+      )
+      : null
+    if (io && wrapRef.current) io.observe(wrapRef.current)
+
+    const onVis = () => {
+      pageVisible = document.visibilityState !== 'hidden'
+    }
+    document.addEventListener('visibilitychange', onVis)
+
     try {
+      const dprCap = isMobileDpr() ? 1 : 1.5
       renderer = new THREE.WebGLRenderer({
         canvas,
-        antialias: true,
+        antialias: !isMobileDpr(),
         alpha: false,
         powerPreference: 'default',
       })
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap))
       renderer.setSize(size, size, false)
       renderer.setClearColor(0x1c1c28, 1)
       if ('outputColorSpace' in renderer) {
@@ -98,11 +136,9 @@ export default function CharacterViewer({
       scene.add(rim)
 
       const url = characterModelUrl(char.id)
-      loader.load(
-        url,
-        (gltf) => {
+      loadGltfCached(url)
+        .then((gltf) => {
           if (disposed) return
-          // SkeletonUtils keeps skinned meshes / bones intact across multi-canvas
           root = cloneSkinned(gltf.scene)
           root.traverse((obj) => {
             obj.frustumCulled = false
@@ -125,29 +161,33 @@ export default function CharacterViewer({
 
           if (gltf.animations?.length) {
             mixer = new THREE.AnimationMixer(root)
+            mixerRef.current = mixer
             const clips = Object.fromEntries(gltf.animations.map((c) => [c.name, c]))
+            clipsRef.current = clips
             const clipName = resolveClipName(animRef.current || 'idle', clips)
             const clip = (clipName && clips[clipName]) || clips.idle || gltf.animations[0]
-            if (clip) mixer.clipAction(clip).play()
+            if (clip) {
+              actionRef.current = mixer.clipAction(clip)
+              actionRef.current.play()
+            }
           }
           setStatus('ready')
           setErr('')
-        },
-        undefined,
-        (e) => {
+        })
+        .catch((e) => {
           if (disposed) return
           console.warn('[CharacterViewer] load failed', e)
           setStatus('error')
           setErr(String(e?.message || e || 'load failed'))
-        },
-      )
+        })
 
       const clock = new THREE.Clock()
       const tick = () => {
         if (disposed) return
+        raf = requestAnimationFrame(tick)
+        if (!visible || !pageVisible) return
         mixer?.update(clock.getDelta())
         renderer.render(scene, camera)
-        raf = requestAnimationFrame(tick)
       }
       raf = requestAnimationFrame(tick)
     } catch (e) {
@@ -159,7 +199,12 @@ export default function CharacterViewer({
     return () => {
       disposed = true
       cancelAnimationFrame(raf)
+      document.removeEventListener('visibilitychange', onVis)
+      io?.disconnect()
       mixer?.stopAllAction()
+      mixerRef.current = null
+      clipsRef.current = null
+      actionRef.current = null
       if (root && scene) {
         scene.remove(root)
         root.traverse((obj) => {
@@ -205,3 +250,5 @@ export default function CharacterViewer({
     </div>
   )
 }
+
+export default memo(CharacterViewer)

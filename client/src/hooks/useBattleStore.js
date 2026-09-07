@@ -34,33 +34,41 @@ const initialState = {
   showCoinDraw: false,
   firstTurnUserId: null,
   coinDrawMs: 2500,
+  pendingMyTurn: false,
   opponentTyping: false,
   lastRoastResult: null,
   lastRoastError: null,
   roastAcceptedAt: null,
+  judging: false,
+  toast: null,
+  connectionStatus: 'online',
+  showRoundTransition: false,
+  roundTransition: null,
   roundScores: [],
   messages: [],
   winner: null,
   opponent: null,
   queueError: null,
   queuePosition: null,
+  queueStartedAt: null,
 }
 
 export const useBattleStore = create((set, get) => ({
   ...initialState,
 
   setBattle: (data) => set({
-    battleId: data.battleId,
+    battleId: data.battleId ?? get().battleId,
     status: data.status,
-    myId: data.myId,
-    opponent: data.opponent,
-    format: data.format || 'best_of_3',
-    mode: data.mode || 'freestyle',
-    topic: data.topic ?? null,
-    currentRound: data.currentRound || 1,
+    myId: data.myId ?? get().myId,
+    opponent: data.opponent !== undefined ? data.opponent : get().opponent,
+    format: data.format || get().format || 'best_of_3',
+    mode: data.mode || get().mode || 'freestyle',
+    topic: data.topic !== undefined ? data.topic : get().topic,
+    currentRound: data.currentRound || get().currentRound || 1,
     isMyTurn: data.isMyTurn || false,
-    queueError: data.queueError ?? null,
-    queuePosition: data.queuePosition ?? null,
+    queueError: data.queueError !== undefined ? data.queueError : null,
+    queuePosition: data.queuePosition !== undefined ? data.queuePosition : get().queuePosition,
+    queueStartedAt: data.queueStartedAt !== undefined ? data.queueStartedAt : get().queueStartedAt,
   }),
 
   startBattle: (data) => set({
@@ -89,6 +97,40 @@ export const useBattleStore = create((set, get) => ({
     roundScores: [],
     winner: null,
     lastRoastResult: null,
+    judging: false,
+    toast: null,
+    showRoundTransition: false,
+    roundTransition: null,
+    connectionStatus: 'online',
+    queueStartedAt: null,
+    queuePosition: null,
+  }),
+
+  hydrateBattle: (snap) => set({
+    status: 'active',
+    battleId: snap.battleId,
+    myId: snap.myId || get().myId,
+    opponent: snap.opponent,
+    format: snap.format || 'best_of_3',
+    mode: snap.mode || 'freestyle',
+    topic: snap.topic ?? null,
+    currentRound: snap.currentRound || 1,
+    isMyTurn: !!snap.isMyTurn,
+    turnLive: !!snap.turnLive,
+    countdownSec: snap.countdownSec || 0,
+    showCoinDraw: false,
+    firstTurnUserId: snap.firstTurnUserId ?? null,
+    myScore: toMarks(snap.myScore ?? 0),
+    opponentScore: toMarks(snap.opponentScore ?? 0),
+    myTotalScore: toTotal(snap.myTotalScore ?? 0),
+    opponentTotalScore: toTotal(snap.opponentTotalScore ?? 0),
+    myRoundWins: snap.myRoundWins || 0,
+    opponentRoundWins: snap.opponentRoundWins || 0,
+    messages: snap.messages || get().messages,
+    winner: null,
+    judging: false,
+    connectionStatus: 'online',
+    toast: { type: 'info', message: 'Reconnected to battle' },
   }),
 
   finishCoinDraw: () => {
@@ -101,6 +143,14 @@ export const useBattleStore = create((set, get) => ({
   },
 
   setOpponentTyping: (typing) => set({ opponentTyping: typing }),
+
+  setJudging: (judging) => set({ judging: !!judging }),
+
+  setToast: (toast) => set({ toast }),
+
+  clearToast: () => set({ toast: null }),
+
+  setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
 
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, {
@@ -125,7 +175,7 @@ export const useBattleStore = create((set, get) => ({
 
     set({
       lastRoastResult: { ...result, marks, quality: marks, score: marks },
-      // Only end our turn when WE scored — late opponent roast_scored must not steal your_turn
+      judging: false,
       isMyTurn: isMine ? false : state.isMyTurn,
       myScore: isMine ? marks : state.myScore,
       opponentScore: !isMine ? marks : state.opponentScore,
@@ -136,11 +186,21 @@ export const useBattleStore = create((set, get) => ({
 
   deductTimeoutPenalty: () => {},
 
+  beginRoundTransition: (data) => set({
+    showRoundTransition: true,
+    roundTransition: data,
+    lastRoastResult: null,
+    judging: false,
+  }),
+
   advanceRound: (data) => set({
     currentRound: data.round,
     myRoundWins: data.myRoundWins,
     opponentRoundWins: data.opponentRoundWins,
     lastRoastResult: null,
+    judging: false,
+    showRoundTransition: false,
+    roundTransition: null,
     roundScores: [...get().roundScores, data.roundResult],
     isMyTurn: data.isMyTurn,
     turnLive: false,
@@ -151,12 +211,16 @@ export const useBattleStore = create((set, get) => ({
   endBattle: (data) => set({
     status: 'completed',
     winner: data.winner,
-    myRoundWins: data.myRoundWins,
-    opponentRoundWins: data.opponentRoundWins,
+    myRoundWins: data.myRoundWins ?? get().myRoundWins,
+    opponentRoundWins: data.opponentRoundWins ?? get().opponentRoundWins,
     myTotalScore: data.myTotalScore != null ? toTotal(data.myTotalScore) : get().myTotalScore,
     opponentTotalScore: data.opponentTotalScore != null ? toTotal(data.opponentTotalScore) : get().opponentTotalScore,
-    roundScores: [...get().roundScores, data.finalRoundResult],
+    roundScores: data.finalRoundResult
+      ? [...get().roundScores, data.finalRoundResult]
+      : get().roundScores,
     showCoinDraw: false,
+    judging: false,
+    showRoundTransition: false,
   }),
 
   setTurn: (isMyTurn) => set({
@@ -177,9 +241,13 @@ export const useBattleStore = create((set, get) => ({
     isMyTurn: true,
   }),
 
-  noteRoastError: () => set({ lastRoastError: Date.now() }),
+  noteRoastError: (message) => set({
+    lastRoastError: Date.now(),
+    judging: false,
+    toast: message ? { type: 'error', message } : get().toast,
+  }),
 
-  noteRoastAccepted: () => set({ roastAcceptedAt: Date.now() }),
+  noteRoastAccepted: () => set({ roastAcceptedAt: Date.now(), judging: true }),
 
-  reset: () => set(initialState),
+  reset: () => set({ ...initialState }),
 }))

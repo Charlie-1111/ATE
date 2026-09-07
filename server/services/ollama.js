@@ -574,15 +574,25 @@ Topic:`,
 async function warmUp() {
   try {
     const ollama = getOllama()
-    const model = FALLBACK_MODEL
-    console.log(`[Ollama] Warming up ${model}...`)
-    await ollama.chat({
-      model,
-      messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
-      stream: false,
-      options: { temperature: 0, num_predict: 4 },
-    })
-    console.log('[Ollama] Warm-up complete')
+    const preferred = JUDGE_MODEL
+    let model = preferred
+    try {
+      await ollama.chat({
+        model: preferred,
+        messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
+        stream: false,
+        options: { temperature: 0, num_predict: 4 },
+      })
+    } catch {
+      model = FALLBACK_MODEL
+      await ollama.chat({
+        model,
+        messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
+        stream: false,
+        options: { temperature: 0, num_predict: 4 },
+      })
+    }
+    console.log(`[Ollama] Warm-up complete (${model})`)
     return true
   } catch (err) {
     console.warn('[Ollama] Warm-up failed:', err.message)

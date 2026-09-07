@@ -1,8 +1,9 @@
-/**
- * character_purchases — was used for Stripe premium unlocks (Stripe removed).
- * Fresh installs still create the table; 005 drops it.
- */
+/** Drop Stripe purchase table — payments removed; unlocks are ranked-wins only. */
 exports.up = async function (knex) {
+  await knex.schema.dropTableIfExists('character_purchases')
+}
+
+exports.down = async function (knex) {
   const has = await knex.schema.hasTable('character_purchases')
   if (!has) {
     await knex.schema.createTable('character_purchases', (table) => {
@@ -14,8 +15,4 @@ exports.up = async function (knex) {
       table.unique(['user_id', 'character_id'])
     })
   }
-}
-
-exports.down = async function (knex) {
-  await knex.schema.dropTableIfExists('character_purchases')
 }

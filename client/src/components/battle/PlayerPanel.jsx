@@ -1,9 +1,10 @@
+import { useEffect, memo } from 'react'
 import { motion } from 'framer-motion'
 import CharacterViewer from '../character/CharacterViewer.jsx'
 import { DEFAULT_CHARACTER_ID } from '../../lib/characterCatalog.js'
 import { UI } from '../../lib/uiAssets.js'
 
-export default function PlayerPanel({ player, isActive, isOpponent, animation = 'idle' }) {
+function PlayerPanel({ player, isActive, isOpponent, animation = 'idle', live = true }) {
   const characterId = player?.characterId || DEFAULT_CHARACTER_ID
 
   return (
@@ -21,7 +22,7 @@ export default function PlayerPanel({ player, isActive, isOpponent, animation = 
         characterId={characterId}
         animation={animation}
         size={120}
-        live
+        live={live}
         className="rounded-xl"
       />
 
@@ -43,3 +44,5 @@ export default function PlayerPanel({ player, isActive, isOpponent, animation = 
     </motion.div>
   )
 }
+
+export default memo(PlayerPanel)

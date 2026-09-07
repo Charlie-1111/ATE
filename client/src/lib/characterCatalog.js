@@ -11,8 +11,8 @@ export const CHARACTERS = [
   { id: 'grid_drip', name: 'Lil Grid Drip', rarity: 'progress', winsRequired: 12, price: null },
   { id: 'vector_drip', name: 'Young Vector Drip', rarity: 'progress', winsRequired: 18, price: null },
   { id: 'poly_drip', name: 'Poly Flow Drip', rarity: 'progress', winsRequired: 25, price: null },
-  { id: 'king_octane', name: 'King Octane', rarity: 'premium', winsRequired: null, price: '$4.99' },
-  { id: 'nova_scott', name: 'Nova Scott', rarity: 'premium', winsRequired: null, price: '$4.99' },
+  { id: 'king_octane', name: 'King Octane', rarity: 'progress', winsRequired: 40, price: null },
+  { id: 'nova_scott', name: 'Nova Scott', rarity: 'progress', winsRequired: 55, price: null },
 ]
 
 const BY_ID = Object.fromEntries(CHARACTERS.map((c) => [c.id, c]))
@@ -43,25 +43,22 @@ export function resolveClipName(want, available = {}) {
   return Object.keys(available)[0] || null
 }
 
-/** Progress unlocks from ranked wins + always Static; premium must be bought separately. */
+/** Progress unlocks from ranked wins + always Static. */
 export function unlockedFromWins(wins = 0) {
   const n = Math.max(0, Number(wins) || 0)
   return CHARACTERS
-    .filter((c) => c.rarity !== 'premium' && (c.winsRequired || 0) <= n)
+    .filter((c) => (c.winsRequired || 0) <= n)
     .map((c) => c.id)
 }
 
-export function isUnlocked(id, { wins = 0, purchasedIds = [] } = {}) {
+export function isUnlocked(id, { wins = 0 } = {}) {
   const c = getCharacter(id)
-  if (c.rarity === 'free') return true
-  if (c.rarity === 'premium') return purchasedIds.includes(c.id)
   return (c.winsRequired || 0) <= wins
 }
 
-export function unlockHint(id, { wins = 0, purchasedIds = [] } = {}) {
+export function unlockHint(id, { wins = 0 } = {}) {
   const c = getCharacter(id)
-  if (isUnlocked(id, { wins, purchasedIds })) return null
-  if (c.rarity === 'premium') return `Buy · ${c.price}`
+  if (isUnlocked(id, { wins })) return null
   const need = (c.winsRequired || 0) - wins
   return need <= 1 ? 'Win 1 more ranked' : `Win ${need} more ranked`
 }
